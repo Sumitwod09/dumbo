@@ -15,6 +15,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
 export function TopHeader() {
   const {
@@ -98,24 +99,40 @@ export function TopHeader() {
 
         {/* Action Pills */}
         <div className="flex items-center gap-2">
-          {/* Persona Switcher for interactive testing */}
-          <button
-            onClick={() =>
-              switchActiveUser(
-                currentUserId === couple.partner1.id
-                  ? couple.partner2.id
-                  : couple.partner1.id
-              )
-            }
-            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            aria-label="Switch partner view"
-            title="Switch partner view"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-rose-500" />
-            <span className="font-medium truncate max-w-[65px]">
-              {activeUser.displayName}
-            </span>
-          </button>
+          <Show when="signed-in">
+            {/* Persona Switcher for interactive testing */}
+            <button
+              onClick={() =>
+                switchActiveUser(
+                  currentUserId === couple.partner1.id
+                    ? couple.partner2.id
+                    : couple.partner1.id
+                )
+              }
+              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              aria-label="Switch partner view"
+              title="Switch partner view"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-rose-500" />
+              <span className="font-medium truncate max-w-[65px]">
+                {activeUser.displayName}
+              </span>
+            </button>
+            <UserButton />
+          </Show>
+
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="text-xs px-3 py-1 rounded-full bg-rose-500 text-white font-semibold hover:bg-rose-600 transition-all">
+                Sign In
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="text-xs px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                Sign Up
+              </button>
+            </SignUpButton>
+          </Show>
 
           {/* Theme Indicator & Toggle */}
           <button
