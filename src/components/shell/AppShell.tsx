@@ -17,6 +17,7 @@ import {
   Timer,
   Droplet,
 } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -26,10 +27,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const { user, isLoaded } = useUser();
   const { currentTheme, computeThemeFromTime } = useThemeStore();
   const { tick, isRunning } = useTimerStore();
   const { startHourlyReminder, stopHourlyReminder } = useHydrationStore();
-  const { initPresence } = useCoupleStore();
+  const { initPresence, syncUserSession, loading } = useCoupleStore();
+
+  // Sync session with Supabase once Clerk is loaded
+  useEffect(() => {
+    if (isLoaded) {
+      syncUserSession(user);
+    }
+  }, [user, isLoaded, syncUserSession]);
 
   // Compute initial theme and trigger timer tick loop
   useEffect(() => {

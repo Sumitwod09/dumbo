@@ -10,7 +10,7 @@ create table if not exists couples (
 );
 
 create table if not exists users (
-  id uuid primary key references auth.users(id),
+  id text primary key,
   couple_id uuid references couples(id),
   display_name text not null,
   avatar_url text,
@@ -27,7 +27,7 @@ create table if not exists songs (
   storage_path text not null,
   cover_art_url text,
   duration_seconds integer default 180,
-  added_by uuid references users(id),
+  added_by text references users(id),
   added_by_name text,
   queue_position integer,
   created_at timestamptz not null default now()
@@ -36,7 +36,7 @@ create table if not exists songs (
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),
   couple_id uuid not null references couples(id),
-  sender_id uuid references users(id),
+  sender_id text references users(id),
   sender_name text,
   content text,
   photo_storage_path text,
@@ -47,7 +47,7 @@ create table if not exists chat_messages (
 create table if not exists hydration_logs (
   id uuid primary key default gen_random_uuid(),
   couple_id uuid not null references couples(id),
-  user_id uuid references users(id),
+  user_id text references users(id),
   user_name text,
   logged_at timestamptz not null default now(),
   amount_ml integer not null default 250
@@ -56,7 +56,7 @@ create table if not exists hydration_logs (
 create table if not exists saved_doodles (
   id uuid primary key default gen_random_uuid(),
   couple_id uuid not null references couples(id),
-  created_by uuid references users(id),
+  created_by text references users(id),
   created_by_name text,
   title text default 'Untitled Doodle',
   storage_path text not null,
@@ -69,7 +69,7 @@ create table if not exists pomodoro_sessions (
   phase text not null default 'idle', -- 'focus', 'break', 'idle'
   remaining_seconds integer not null default 1500,
   total_seconds integer not null default 1500,
-  started_by uuid references users(id),
+  started_by text references users(id),
   started_by_name text,
   is_running boolean default false,
   updated_at timestamptz not null default now()

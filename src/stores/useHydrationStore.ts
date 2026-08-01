@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { HydrationLog } from "@/types";
-import { MOCK_HYDRATION_LOGS } from "@/lib/mock/mockData";
+import { supabase } from "@/lib/supabase/client";
+import { useCoupleStore } from "./useCoupleStore";
 
 let hourlyReminderInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -10,7 +11,8 @@ interface HydrationState {
   reminderActive: boolean;
 
   // Actions
-  logWater: (amountMl: number, userId: string, userName: string) => void;
+  fetchLogs: (coupleId: string) => Promise<void>;
+  logWater: (amountMl: number, userId: string, userName: string) => Promise<void>;
   triggerHourlyReminder: () => void;
   dismissReminder: () => void;
   getUserDailyTotal: (userId: string) => number;
@@ -19,35 +21,73 @@ interface HydrationState {
 }
 
 export const useHydrationStore = create<HydrationState>((set, get) => ({
-  logs: MOCK_HYDRATION_LOGS,
+  logs: [],
   dailyTargetMl: 2000,
   reminderActive: true,
 
-  logWater: (amountMl, userId, userName) => {
-    const newLog: HydrationLog = {
-      id: `hyd-${Date.now()}`,
-      coupleId: "couple-888-999-111",
-      userId,
-      userName,
-      loggedAt: new Date().toISOString(),
-      amountMl,
-    };
+  fetchLogs: async (coupleId: string) => {
+    const { data, error } = await supabase
+      .from("hydration_logs")
+      .select("*")
+      .eq("couple_id", coupleId)
+      .order("logged_at", { ascending: false });
 
-    const updatedLogs = [newLog, ...get().logs];
-    set({ logs: updatedLogs, reminderActive: false });
+    if (!error && data) {
+      set({
+        logs: data.map((h) => ({
+          id: h.id,
+          coupleId: h.couple_id,
+          userId: h.user_id,
+          userName: h.user_name || "User",
+          loggedAt: h.logged_at,
+          amountMl: h.amount_ml,
+        })),
+      });
+    }
+  },
 
-    // Check if target reached and trigger celebration
-    const total = get().getUserDailyTotal(userId);
-    if (total >= get().dailyTargetMl) {
-      if (typeof window !== "undefined") {
-        import("canvas-confetti").then((mod) => {
-          const confetti = mod.default;
-          confetti({
-            particleCount: 80,
-            spread: 70,
-            origin: { y: 0.6 },
-          });
-        }).catch(() => {});
+  logWater: async (amountMl, userId, userName) => {
+    const { couple } = useCoupleStore.getState();
+    if (!couple || !couple.id) return;
+
+    const { data, error } = await supabase
+      .from("hydration_logs")
+      .insert({
+        couple_id: couple.id,
+        user_id: userId,
+        user_name: userName,
+        amount_ml: amountMl,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      const newLog: HydrationLog = {
+        id: data.id,
+        coupleId: data.couple_id,
+        userId: data.user_id,
+        userName: data.user_name || userName,
+        loggedAt: data.logged_at,
+        amountMl: data.amount_ml,
+      };
+
+      set((state) => ({ logs: [newLog, ...state.logs], reminderActive: false }));
+
+      // Check if target reached and trigger celebration
+      const total = get().getUserDailyTotal(userId);
+      if (total >= get().dailyTargetMl) {
+        if (typeof window !== "undefined") {
+          import("canvas-confetti")
+            .then((mod) => {
+              const confetti = mod.default;
+              confetti({
+                particleCount: 80,
+                spread: 70,
+                origin: { y: 0.6 },
+              });
+            })
+            .catch(() => {});
+        }
       }
     }
   },

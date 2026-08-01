@@ -1,88 +1,271 @@
 import { create } from "zustand";
 import { Couple, UserProfile } from "@/types";
-import { MOCK_COUPLE } from "@/lib/mock/mockData";
+import { supabase } from "@/lib/supabase/client";
+import { useAudioStore } from "./useAudioStore";
+import { useChatStore } from "./useChatStore";
+import { useHydrationStore } from "./useHydrationStore";
+import { useCanvasStore } from "./useCanvasStore";
+
+const PLACEHOLDER_PARTNER: UserProfile = {
+  id: "no-partner-yet",
+  coupleId: "",
+  displayName: "Waiting for partner...",
+  avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=placeholder",
+  isOnline: false,
+  isDnd: false,
+};
+
+const DEFAULT_COUPLE: Couple = {
+  id: "",
+  createdAt: new Date().toISOString(),
+  pairingCode: "",
+  partner1: {
+    id: "loading",
+    coupleId: "",
+    displayName: "Loading...",
+    avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=loading",
+    isOnline: false,
+    isDnd: false,
+  },
+  partner2: PLACEHOLDER_PARTNER,
+};
 
 interface CoupleState {
   couple: Couple;
-  currentUserId: string; // active persona
+  currentUserId: string;
   isPaired: boolean;
+  loading: boolean;
 
   // Actions
-  switchActiveUser: (userId: string) => void;
-  toggleDnd: (userId: string) => void;
-  setPairingCode: (code: string) => void;
-  setOnlineStatus: (userId: string, isOnline: boolean) => void;
+  syncUserSession: (clerkUser: any) => Promise<void>;
+  toggleDnd: (userId: string) => Promise<void>;
+  setPairingCode: (code: string) => Promise<void>;
+  setOnlineStatus: (userId: string, isOnline: boolean) => Promise<void>;
   getActiveUser: () => UserProfile;
   getPartnerUser: () => UserProfile;
   initPresence: () => () => void;
+  switchActiveUser: (userId: string) => void;
 }
 
 export const useCoupleStore = create<CoupleState>((set, get) => ({
-  couple: MOCK_COUPLE,
-  currentUserId: MOCK_COUPLE.partner1.id,
-  isPaired: true,
+  couple: DEFAULT_COUPLE,
+  currentUserId: "",
+  isPaired: false,
+  loading: true,
 
-  switchActiveUser: (userId: string) => set({ currentUserId: userId }),
+  switchActiveUser: () => {}, // No-op, managed by Clerk
 
-  toggleDnd: (userId: string) => {
-    const { couple } = get();
-    const updatedCouple = { ...couple };
-
-    if (updatedCouple.partner1.id === userId) {
-      updatedCouple.partner1 = {
-        ...updatedCouple.partner1,
-        isDnd: !updatedCouple.partner1.isDnd,
-      };
-    } else if (updatedCouple.partner2.id === userId) {
-      updatedCouple.partner2 = {
-        ...updatedCouple.partner2,
-        isDnd: !updatedCouple.partner2.isDnd,
-      };
+  syncUserSession: async (clerkUser: any) => {
+    if (!clerkUser) {
+      set({ couple: DEFAULT_COUPLE, currentUserId: "", isPaired: false, loading: false });
+      return;
     }
 
-    set({ couple: updatedCouple });
-  },
+    const userId = clerkUser.id;
+    const displayName = clerkUser.fullName || clerkUser.firstName || "You";
+    const avatarUrl = clerkUser.imageUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(displayName)}`;
 
-  setPairingCode: (code: string) => {
-    const { couple } = get();
+    // 1. Upsert profile in Supabase
+    const { data: userProfile, error: upsertErr } = await supabase
+      .from("users")
+      .upsert({
+        id: userId,
+        display_name: displayName,
+        avatar_url: avatarUrl,
+      })
+      .select()
+      .single();
+
+    if (upsertErr || !userProfile) {
+      console.error("Failed to sync user profile:", upsertErr);
+      return;
+    }
+
+    set({ currentUserId: userId });
+
+    // 2. Fetch pairing status
+    if (userProfile.couple_id) {
+      const { data: members, error: membersErr } = await supabase
+        .from("users")
+        .select("*")
+        .eq("couple_id", userProfile.couple_id);
+
+      if (!membersErr && members) {
+        const active = members.find((m) => m.id === userId) || userProfile;
+        const partner = members.find((m) => m.id !== userId);
+
+        const activeUser: UserProfile = {
+          id: active.id,
+          coupleId: active.couple_id,
+          displayName: active.display_name,
+          avatarUrl: active.avatar_url,
+          isOnline: active.is_online,
+          isDnd: active.is_dnd,
+        };
+
+        const partnerUser: UserProfile = partner
+          ? {
+              id: partner.id,
+              coupleId: partner.couple_id,
+              displayName: partner.display_name,
+              avatarUrl: partner.avatar_url,
+              isOnline: partner.is_online,
+              isDnd: partner.is_dnd,
+            }
+          : PLACEHOLDER_PARTNER;
+
+        // Fetch the couple details (pairing code)
+        const { data: coupleDetails } = await supabase
+          .from("couples")
+          .select("*")
+          .eq("id", userProfile.couple_id)
+          .single();
+
+        set({
+          couple: {
+            id: userProfile.couple_id,
+            createdAt: coupleDetails?.created_at || new Date().toISOString(),
+            pairingCode: coupleDetails?.pairing_code || "UNPAIRED",
+            partner1: activeUser,
+            partner2: partnerUser,
+          },
+          isPaired: !!partner,
+          loading: false,
+        });
+
+        // Trigger background data fetches for the couple space
+        useAudioStore.getState().fetchSongs(userProfile.couple_id);
+        useChatStore.getState().fetchMessages(userProfile.couple_id);
+        useHydrationStore.getState().fetchLogs(userProfile.couple_id);
+        useCanvasStore.getState().fetchDoodles(userProfile.couple_id);
+
+        return;
+      }
+    }
+
+    // Unpaired/no couple yet
+    const activeUser: UserProfile = {
+      id: userProfile.id,
+      coupleId: "",
+      displayName: userProfile.display_name,
+      avatarUrl: userProfile.avatar_url,
+      isOnline: userProfile.is_online,
+      isDnd: userProfile.is_dnd,
+    };
+
     set({
-      couple: { ...couple, pairingCode: code },
-      isPaired: true,
+      couple: {
+        id: "",
+        createdAt: new Date().toISOString(),
+        pairingCode: "",
+        partner1: activeUser,
+        partner2: PLACEHOLDER_PARTNER,
+      },
+      isPaired: false,
+      loading: false,
     });
   },
 
-  setOnlineStatus: (userId: string, isOnline: boolean) => {
-    const { couple } = get();
-    const updatedCouple = { ...couple };
+  toggleDnd: async (userId: string) => {
+    const { couple, currentUserId } = get();
+    if (!couple || !currentUserId) return;
 
-    if (updatedCouple.partner1.id === userId) {
-      updatedCouple.partner1 = { ...updatedCouple.partner1, isOnline };
-    } else if (updatedCouple.partner2.id === userId) {
-      updatedCouple.partner2 = { ...updatedCouple.partner2, isOnline };
+    const isActiveUser = userId === currentUserId;
+    const targetUser = isActiveUser ? couple.partner1 : couple.partner2;
+    const newDnd = !targetUser.isDnd;
+
+    if (isActiveUser) {
+      // Persist active user's DND to database
+      await supabase.from("users").update({ is_dnd: newDnd }).eq("id", userId);
     }
 
-    set({ couple: updatedCouple });
+    // Optimistically update store state
+    set({
+      couple: {
+        ...couple,
+        partner1: isActiveUser ? { ...couple.partner1, isDnd: newDnd } : couple.partner1,
+        partner2: !isActiveUser ? { ...couple.partner2, isDnd: newDnd } : couple.partner2,
+      },
+    });
+  },
+
+  setPairingCode: async (code: string) => {
+    const { currentUserId } = get();
+    if (!currentUserId) return;
+
+    // 1. Check if couple with code already exists (Join flow)
+    const { data: existingCouple } = await supabase
+      .from("couples")
+      .select("*")
+      .eq("pairing_code", code)
+      .single();
+
+    let coupleId = existingCouple?.id;
+
+    if (!coupleId) {
+      // 2. If not, create new couple (Create flow)
+      const { data: newCouple, error: createErr } = await supabase
+        .from("couples")
+        .insert({ pairing_code: code })
+        .select()
+        .single();
+
+      if (createErr) {
+        console.error("Failed to create couple:", createErr);
+        return;
+      }
+      coupleId = newCouple.id;
+    }
+
+    // 3. Link user to the couple
+    await supabase.from("users").update({ couple_id: coupleId }).eq("id", currentUserId);
+
+    // 4. Re-sync user session
+    const { data: freshUser } = await supabase.from("users").select("*").eq("id", currentUserId).single();
+    if (freshUser) {
+      const clerkUserMock = {
+        id: freshUser.id,
+        fullName: freshUser.display_name,
+        imageUrl: freshUser.avatar_url,
+      };
+      await get().syncUserSession(clerkUserMock);
+    }
+  },
+
+  setOnlineStatus: async (userId: string, isOnline: boolean) => {
+    const { couple, currentUserId } = get();
+    if (!couple || !currentUserId) return;
+
+    if (userId === currentUserId) {
+      await supabase.from("users").update({ is_online: isOnline }).eq("id", userId);
+    }
+
+    const isActiveUser = userId === currentUserId;
+    set({
+      couple: {
+        ...couple,
+        partner1: isActiveUser ? { ...couple.partner1, isOnline } : couple.partner1,
+        partner2: !isActiveUser ? { ...couple.partner2, isOnline } : couple.partner2,
+      },
+    });
   },
 
   getActiveUser: () => {
-    const { couple, currentUserId } = get();
-    return currentUserId === couple.partner1.id
-      ? couple.partner1
-      : couple.partner2;
+    const { couple } = get();
+    return couple.partner1;
   },
 
   getPartnerUser: () => {
-    const { couple, currentUserId } = get();
-    return currentUserId === couple.partner1.id
-      ? couple.partner2
-      : couple.partner1;
+    const { couple } = get();
+    return couple.partner2;
   },
 
-  // Set active user online and register beforeunload listener
   initPresence: () => {
     if (typeof window === "undefined") return () => {};
 
     const { currentUserId, setOnlineStatus } = get();
+    if (!currentUserId) return () => {};
+
     setOnlineStatus(currentUserId, true);
 
     const handleBeforeUnload = () => {

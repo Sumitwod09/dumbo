@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import { Howl } from "howler";
 import { Song } from "@/types";
-import { MOCK_SONGS } from "@/lib/mock/mockData";
 import { createTrackHowl } from "@/lib/audio/howler-instance";
+import { supabase } from "@/lib/supabase/client";
+import { useCoupleStore } from "./useCoupleStore";
 
 // Module-level RAF id — not in Zustand state (non-serializable)
 let positionRafId: number | null = null;
@@ -24,6 +25,7 @@ interface AudioState {
   howlInstance: Howl | null;
 
   // Actions
+  fetchSongs: (coupleId: string) => Promise<void>;
   setQueue: (queue: Song[]) => void;
   playTrack: (track: Song) => void;
   togglePlay: () => void;
@@ -31,8 +33,8 @@ interface AudioState {
   setVolume: (volume: number) => void;
   nextTrack: () => void;
   prevTrack: () => void;
-  addTrack: (track: Omit<Song, "id" | "createdAt" | "queuePosition">) => void;
-  removeTrack: (id: string) => void;
+  addTrack: (track: Omit<Song, "id" | "createdAt" | "queuePosition">) => Promise<void>;
+  removeTrack: (id: string) => Promise<void>;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
 }
 
@@ -57,13 +59,42 @@ export const useAudioStore = create<AudioState>((set, get) => {
   }
 
   return {
-    currentTrack: MOCK_SONGS[0],
-    queue: MOCK_SONGS,
+    currentTrack: null,
+    queue: [],
     isPlaying: false,
     positionSeconds: 0,
-    durationSeconds: MOCK_SONGS[0].durationSeconds,
+    durationSeconds: 180,
     volume: 0.8,
     howlInstance: null,
+
+    fetchSongs: async (coupleId: string) => {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("*")
+        .eq("couple_id", coupleId)
+        .order("queue_position", { ascending: true });
+
+      if (!error && data) {
+        const mappedSongs: Song[] = data.map((s) => ({
+          id: s.id,
+          coupleId: s.couple_id,
+          title: s.title,
+          artist: s.artist || "Unknown Artist",
+          storagePath: s.storage_path,
+          coverArtUrl: s.cover_art_url,
+          durationSeconds: s.duration_seconds || 180,
+          addedBy: s.added_by,
+          addedByName: s.added_by_name || "Partner",
+          queuePosition: s.queue_position || 1,
+          createdAt: s.created_at,
+        }));
+        set({
+          queue: mappedSongs,
+          currentTrack: mappedSongs[0] || null,
+          durationSeconds: mappedSongs[0]?.durationSeconds || 180,
+        });
+      }
+    },
 
     setQueue: (queue) => set({ queue }),
 
@@ -150,24 +181,54 @@ export const useAudioStore = create<AudioState>((set, get) => {
       playTrack(queue[prevIndex]);
     },
 
-    addTrack: (trackData) => {
+    addTrack: async (trackData) => {
+      const { couple } = useCoupleStore.getState();
+      if (!couple || !couple.id) return;
       const { queue } = get();
-      const newTrack: Song = {
-        ...trackData,
-        id: `song-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        queuePosition: queue.length + 1,
-      };
-      const updatedQueue = [...queue, newTrack];
-      set({ queue: updatedQueue });
+
+      const { data, error } = await supabase
+        .from("songs")
+        .insert({
+          couple_id: couple.id,
+          title: trackData.title,
+          artist: trackData.artist,
+          storage_path: trackData.storagePath,
+          cover_art_url: trackData.coverArtUrl || "",
+          duration_seconds: trackData.durationSeconds,
+          added_by: trackData.addedBy,
+          added_by_name: trackData.addedByName,
+          queue_position: queue.length + 1,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        const newTrack: Song = {
+          id: data.id,
+          coupleId: data.couple_id,
+          title: data.title,
+          artist: data.artist || "Unknown Artist",
+          storagePath: data.storage_path,
+          coverArtUrl: data.cover_art_url,
+          durationSeconds: data.duration_seconds || 180,
+          addedBy: data.added_by,
+          addedByName: data.added_by_name || "Partner",
+          queuePosition: data.queue_position || 1,
+          createdAt: data.created_at,
+        };
+        set({ queue: [...queue, newTrack] });
+      }
     },
 
-    removeTrack: (id) => {
+    removeTrack: async (id) => {
       const { queue, currentTrack } = get();
+      await supabase.from("songs").delete().eq("id", id);
+
       const updatedQueue = queue
         .filter((t) => t.id !== id)
         .map((t, idx) => ({ ...t, queuePosition: idx + 1 }));
       set({ queue: updatedQueue });
+
       if (currentTrack?.id === id && updatedQueue.length > 0) {
         get().playTrack(updatedQueue[0]);
       }
@@ -184,4 +245,3 @@ export const useAudioStore = create<AudioState>((set, get) => {
     },
   };
 });
-

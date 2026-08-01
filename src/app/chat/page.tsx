@@ -35,7 +35,7 @@ export default function ChatPage() {
     incrementCallDuration,
   } = useChatStore();
 
-  const { getActiveUser, getPartnerUser } = useCoupleStore();
+  const { getActiveUser, getPartnerUser, isPaired } = useCoupleStore();
   const activeUser = getActiveUser();
   const partnerUser = getPartnerUser();
 
@@ -218,44 +218,52 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Controls */}
-      <form onSubmit={handleSend} className="pt-2 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => photoInputRef.current?.click()}
-          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-500 transition-colors"
-          aria-label="Share a photo"
-          title="Share photo"
-        >
-          <ImageIcon className="w-4 h-4" />
-        </button>
-        <input
-          ref={photoInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handlePhotoFileSelect}
-          className="hidden"
-          aria-label="Select photo to share"
-        />
+      {/* Input Controls or Invitation Guard Card */}
+      {isPaired ? (
+        <form onSubmit={handleSend} className="pt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-500 transition-colors"
+            aria-label="Share a photo"
+            title="Share photo"
+          >
+            <ImageIcon className="w-4 h-4" />
+          </button>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhotoFileSelect}
+            className="hidden"
+            aria-label="Select photo to share"
+          />
 
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="Message your partner..."
-          className="flex-1 px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-sm"
-          aria-label="Type a message"
-        />
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Message your partner..."
+            className="flex-1 px-4 py-2.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-sm"
+            aria-label="Type a message"
+          />
 
-        <button
-          type="submit"
-          className="p-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-colors"
-          aria-label="Send message"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="p-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-colors"
+            aria-label="Send message"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </form>
+      ) : (
+        <div className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/40 rounded-2xl p-4 text-center mt-2 shadow-sm">
+          <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
+            No one to chat with yet. Invite your partner to start chatting.
+          </p>
+        </div>
+      )}
 
       {/* WebRTC Video Call Modal Overlay */}
       {callState.isCallActive && (
