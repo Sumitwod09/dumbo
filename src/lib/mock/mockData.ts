@@ -1,0 +1,161 @@
+import { Couple, Song, ChatMessage, HydrationLog, SavedDoodle } from "@/types";
+
+export const MOCK_COUPLE: Couple = {
+  id: "couple-888-999-111",
+  createdAt: "2026-02-14T08:00:00Z",
+  pairingCode: "DUMBO-2026",
+  partner1: {
+    id: "partner-1-alex",
+    coupleId: "couple-888-999-111",
+    displayName: "Alex 🌸",
+    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    isOnline: true,
+    isDnd: false,
+  },
+  partner2: {
+    id: "partner-2-sam",
+    coupleId: "couple-888-999-111",
+    displayName: "Sam 💫",
+    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    isOnline: true,
+    isDnd: false,
+  },
+};
+
+export const MOCK_SONGS: Song[] = [
+  {
+    id: "song-1",
+    coupleId: "couple-888-999-111",
+    title: "Sunset Lo-Fi Chill",
+    artist: "Acoustic Sunset Project",
+    storagePath: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
+    durationSeconds: 165,
+    addedBy: "partner-1-alex",
+    addedByName: "Alex",
+    queuePosition: 1,
+    createdAt: "2026-07-29T10:00:00Z",
+    coverArtUrl: "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "song-2",
+    coupleId: "couple-888-999-111",
+    title: "Midnight Stargazing",
+    artist: "Celestial Waves",
+    storagePath: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3",
+    durationSeconds: 210,
+    addedBy: "partner-2-sam",
+    addedByName: "Sam",
+    queuePosition: 2,
+    createdAt: "2026-07-29T11:30:00Z",
+    coverArtUrl: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=300&auto=format&fit=crop&q=80",
+  },
+  {
+    id: "song-3",
+    coupleId: "couple-888-999-111",
+    title: "Cozy Morning Coffee",
+    artist: "Peaceful Mindset",
+    storagePath: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3",
+    durationSeconds: 180,
+    addedBy: "partner-1-alex",
+    addedByName: "Alex",
+    queuePosition: 3,
+    createdAt: "2026-07-29T12:15:00Z",
+    coverArtUrl: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&auto=format&fit=crop&q=80",
+  },
+];
+
+export const MOCK_CHAT_MESSAGES: ChatMessage[] = [
+  {
+    id: "msg-1",
+    coupleId: "couple-888-999-111",
+    senderId: "partner-1-alex",
+    senderName: "Alex",
+    content: "Good morning! Ready for our shared focus session later today? ☕",
+    readAt: "2026-07-29T08:05:00Z",
+    createdAt: "2026-07-29T08:00:00Z",
+  },
+  {
+    id: "msg-2",
+    coupleId: "couple-888-999-111",
+    senderId: "partner-2-sam",
+    senderName: "Sam",
+    content: "Yes! Added a new lo-fi track to our shared player queue. Listen whenever you start drawing!",
+    readAt: "2026-07-29T08:10:00Z",
+    createdAt: "2026-07-29T08:06:00Z",
+  },
+  {
+    id: "msg-3",
+    coupleId: "couple-888-999-111",
+    senderId: "partner-1-alex",
+    senderName: "Alex",
+    content: "Check out this sketch idea I saved in our canvas library! 🎨",
+    photoStoragePath: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80",
+    readAt: "2026-07-29T08:15:00Z",
+    createdAt: "2026-07-29T08:12:00Z",
+  },
+  {
+    id: "msg-4",
+    coupleId: "couple-888-999-111",
+    senderId: "partner-2-sam",
+    senderName: "Sam",
+    content: "Love it! Just logged my morning water intake too. Don't forget to stay hydrated! 💧",
+    readAt: null,
+    createdAt: "2026-07-29T08:20:00Z",
+  },
+];
+
+export const MOCK_HYDRATION_LOGS: HydrationLog[] = [
+  {
+    id: "hyd-1",
+    coupleId: "couple-888-999-111",
+    userId: "partner-1-alex",
+    userName: "Alex",
+    loggedAt: "2026-07-29T07:30:00Z",
+    amountMl: 250,
+  },
+  {
+    id: "hyd-2",
+    coupleId: "couple-888-999-111",
+    userId: "partner-2-sam",
+    userName: "Sam",
+    loggedAt: "2026-07-29T08:15:00Z",
+    amountMl: 500,
+  },
+  {
+    id: "hyd-3",
+    coupleId: "couple-888-999-111",
+    userId: "partner-1-alex",
+    userName: "Alex",
+    loggedAt: "2026-07-29T10:00:00Z",
+    amountMl: 350,
+  },
+  {
+    id: "hyd-4",
+    coupleId: "couple-888-999-111",
+    userId: "partner-2-sam",
+    userName: "Sam",
+    loggedAt: "2026-07-29T11:45:00Z",
+    amountMl: 250,
+  },
+];
+
+export const MOCK_SAVED_DOODLES: SavedDoodle[] = [
+  {
+    id: "doodle-1",
+    coupleId: "couple-888-999-111",
+    createdBy: "partner-1-alex",
+    createdByName: "Alex",
+    storagePath: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80",
+    title: "Abstract Morning Mood",
+    createdAt: "2026-07-28T18:30:00Z",
+  },
+  {
+    id: "doodle-2",
+    coupleId: "couple-888-999-111",
+    createdBy: "partner-2-sam",
+    createdByName: "Sam",
+    storagePath: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=500&auto=format&fit=crop&q=80",
+    title: "Starry Night Canvas",
+    createdAt: "2026-07-29T09:15:00Z",
+  },
+];
