@@ -201,8 +201,21 @@ export default function ChatPage() {
                       })}
                     </span>
                     {isMine && (
-                      <span title={msg.readAt ? "Read by partner" : "Sent"}>
-                        {msg.readAt ? (
+                      <span
+                        title={
+                          (msg as any).isPendingSync
+                            ? "Offline - Saved locally, pending auto-sync when online"
+                            : msg.readAt
+                            ? "Read by partner"
+                            : "Sent"
+                        }
+                      >
+                        {(msg as any).isPendingSync ? (
+                          <span className="text-[9px] flex items-center gap-0.5 text-amber-200">
+                            <span>Pending</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" />
+                          </span>
+                        ) : msg.readAt ? (
                           <CheckCheck className="w-3 h-3 text-sky-200" />
                         ) : (
                           <Check className="w-3 h-3 text-rose-200" />

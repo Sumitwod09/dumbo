@@ -63,9 +63,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => stopHourlyReminder();
   }, [startHourlyReminder, stopHourlyReminder]);
 
-  // Initialize online presence
+  // Initialize online presence & register offline Service Worker
   useEffect(() => {
     const cleanup = initPresence();
+
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => console.log("Service Worker registered:", reg.scope))
+        .catch((err) => console.warn("Service Worker registration failed:", err));
+    }
+
     return cleanup;
   }, [initPresence]);
 
