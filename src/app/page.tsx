@@ -107,6 +107,31 @@ export default function HomeDashboard() {
         </div>
       </div>
 
+      {/* Mobile Android APK Download Banner */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-violet-500/10 border border-amber-500/20 dark:border-amber-500/30 rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+            📱
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+              Get Mobile App (APK)
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              100% Offline Chat & Cellular SMS Fallback
+            </p>
+          </div>
+        </div>
+        <a
+          href="https://github.com/Sumitwod09/dumbo/releases/download/v1.0.0/dumbo-app-debug.apk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1 hover:scale-105 active:scale-95"
+        >
+          <span>Download</span>
+        </a>
+      </div>
+
       {/* 2. Grid Shortcuts */}
       <div className="grid grid-cols-2 gap-3">
         {/* Audio Card */}
