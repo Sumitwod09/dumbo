@@ -4,6 +4,7 @@ export interface UserProfile {
   id: string;
   coupleId: string;
   displayName: string;
+  username?: string;
   avatarUrl: string;
   isOnline: boolean;
   isDnd: boolean;

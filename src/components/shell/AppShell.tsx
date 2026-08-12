@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Timer,
   Droplet,
+  User,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 
@@ -84,6 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { label: "Chat", href: "/chat", icon: MessageCircle },
     { label: "Focus", href: "/focus", icon: Timer },
     { label: "Water", href: "/hydration", icon: Droplet },
+    { label: "Profile", href: "/profile", icon: User },
   ];
 
   return (

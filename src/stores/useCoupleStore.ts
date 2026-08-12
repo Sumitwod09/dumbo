@@ -61,6 +61,8 @@ interface CoupleState {
   setSearchQuery: (query: string) => void;
   syncUserSession: (clerkUser: any) => Promise<void>;
   fetchAvailableUsers: () => Promise<void>;
+  updateProfile: (displayName: string, username: string) => Promise<{ success: boolean; error?: string }>;
+  checkUsernameAvailability: (username: string) => boolean;
   sendPartnerRequest: (targetUser: UserProfile) => Promise<void>;
   acceptPartnerRequest: (requestId: string) => Promise<void>;
   declinePartnerRequest: (requestId: string) => Promise<void>;
@@ -88,6 +90,7 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
       id: "user_kirti",
       coupleId: "",
       displayName: "Kirti Chaudhari",
+      username: "kirti",
       avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Kirti",
       isOnline: true,
       isDnd: false,
@@ -96,6 +99,7 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
       id: "user_sumit",
       coupleId: "",
       displayName: "Sumit Wod",
+      username: "sumit",
       avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Sumit",
       isOnline: true,
       isDnd: false,
@@ -105,6 +109,68 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
   setSearchQuery: (query: string) => set({ searchQuery: query }),
 
   switchActiveUser: () => {}, // Managed by Clerk
+
+  checkUsernameAvailability: (username: string) => {
+    const clean = username.trim().toLowerCase().replace(/^@/, "");
+    if (!clean) return false;
+    const { availableUsers, currentUserId } = get();
+    const existing = availableUsers.find(
+      (u) => u.id !== currentUserId && u.username?.toLowerCase() === clean
+    );
+    return !existing;
+  },
+
+  updateProfile: async (displayName: string, username: string) => {
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, "");
+    const { currentUserId, couple, availableUsers, checkUsernameAvailability } = get();
+
+    if (!displayName.trim()) {
+      return { success: false, error: "Display name cannot be empty." };
+    }
+
+    if (cleanUsername && !checkUsernameAvailability(cleanUsername)) {
+      return { success: false, error: `Username @${cleanUsername} is already taken by another user.` };
+    }
+
+    const updatedPartner1: UserProfile = {
+      ...couple.partner1,
+      displayName: displayName.trim(),
+      username: cleanUsername,
+    };
+
+    const updatedCouple = {
+      ...couple,
+      partner1: updatedPartner1,
+    };
+
+    const updatedAvailableUsers = availableUsers.map((u) =>
+      u.id === currentUserId
+        ? { ...u, displayName: displayName.trim(), username: cleanUsername }
+        : u
+    );
+
+    set({
+      couple: updatedCouple,
+      availableUsers: updatedAvailableUsers,
+    });
+    saveLocalCouple(updatedCouple);
+
+    if (navigator.onLine && currentUserId) {
+      try {
+        await supabase
+          .from("users")
+          .update({
+            display_name: displayName.trim(),
+            username: cleanUsername,
+          })
+          .eq("id", currentUserId);
+      } catch (err) {
+        console.warn("Offline profile sync queued:", err);
+      }
+    }
+
+    return { success: true };
+  },
 
   fetchAvailableUsers: async () => {
     try {
@@ -118,6 +184,7 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
           id: u.id,
           coupleId: u.couple_id || "",
           displayName: u.display_name || u.id,
+          username: u.username || "",
           avatarUrl: u.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.id}`,
           isOnline: u.is_online || false,
           isDnd: u.is_dnd || false,
