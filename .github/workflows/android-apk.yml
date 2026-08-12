@@ -50,6 +50,10 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
+      - name: Setup Android SDK location
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
