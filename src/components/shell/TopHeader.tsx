@@ -23,6 +23,7 @@ import {
   Search,
   Download,
   Smartphone,
+  UserPlus,
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
@@ -325,12 +326,12 @@ export function TopHeader() {
                         {!isCurrent && (
                           <div>
                             {reqStatus === "accepted" ? (
-                              <span className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                              <span className="text-xs px-2.5 py-1 rounded-lg font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                                 Connected ♥
                               </span>
                             ) : reqStatus === "pending_sent" ? (
-                              <span className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                                Request Sent ⏳
+                              <span className="text-xs px-2.5 py-1 rounded-lg font-bold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                Connection Pending ⏳
                               </span>
                             ) : reqStatus === "pending_received" ? (
                               <button
@@ -340,16 +341,17 @@ export function TopHeader() {
                                   );
                                   if (incoming) acceptPartnerRequest(incoming.id);
                                 }}
-                                className="text-xs px-2.5 py-1 rounded-lg font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
+                                className="text-xs px-2.5 py-1 rounded-lg font-extrabold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
                               >
-                                Accept Request
+                                Accept Connection
                               </button>
                             ) : (
                               <button
                                 onClick={() => sendPartnerRequest(u)}
-                                className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
+                                className="text-xs px-2.5 py-1 rounded-lg font-extrabold bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all flex items-center gap-1"
                               >
-                                Send Request
+                                <UserPlus className="w-3.5 h-3.5" />
+                                <span>Connect</span>
                               </button>
                             )}
                           </div>
