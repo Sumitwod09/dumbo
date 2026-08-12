@@ -8,8 +8,21 @@ import { useCanvasStore } from "./useCanvasStore";
 import {
   saveLocalCouple,
   getLocalCouple,
+  saveLocalRequests,
+  getLocalRequests,
   enqueuePendingAction,
 } from "@/lib/offline/storageEngine";
+
+export interface PartnerRequest {
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  fromUserAvatar: string;
+  toUserId: string;
+  toUserName: string;
+  status: "pending" | "accepted" | "declined";
+  createdAt: string;
+}
 
 const PLACEHOLDER_PARTNER: UserProfile = {
   id: "no-partner-yet",
@@ -41,10 +54,18 @@ interface CoupleState {
   isPaired: boolean;
   loading: boolean;
   availableUsers: UserProfile[];
+  searchQuery: string;
+  partnerRequests: PartnerRequest[];
 
   // Actions
+  setSearchQuery: (query: string) => void;
   syncUserSession: (clerkUser: any) => Promise<void>;
   fetchAvailableUsers: () => Promise<void>;
+  sendPartnerRequest: (targetUser: UserProfile) => Promise<void>;
+  acceptPartnerRequest: (requestId: string) => Promise<void>;
+  declinePartnerRequest: (requestId: string) => Promise<void>;
+  getRequestStatusForUser: (userId: string) => "none" | "pending_sent" | "pending_received" | "accepted" | "declined";
+  getIncomingRequests: () => PartnerRequest[];
   pairWithUser: (targetUser: UserProfile) => Promise<void>;
   toggleDnd: (userId: string) => Promise<void>;
   setPairingCode: (code: string) => Promise<void>;
@@ -60,6 +81,8 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
   currentUserId: "",
   isPaired: false,
   loading: true,
+  searchQuery: "",
+  partnerRequests: getLocalRequests(),
   availableUsers: [
     {
       id: "user_kirti",
@@ -78,6 +101,8 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
       isDnd: false,
     },
   ],
+
+  setSearchQuery: (query: string) => set({ searchQuery: query }),
 
   switchActiveUser: () => {}, // Managed by Clerk
 
@@ -104,16 +129,92 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
     }
   },
 
+  sendPartnerRequest: async (targetUser: UserProfile) => {
+    const { getActiveUser, partnerRequests } = get();
+    const activeUser = getActiveUser();
+
+    const newRequest: PartnerRequest = {
+      id: `req-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      fromUserId: activeUser.id,
+      fromUserName: activeUser.displayName,
+      fromUserAvatar: activeUser.avatarUrl,
+      toUserId: targetUser.id,
+      toUserName: targetUser.displayName,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [...partnerRequests, newRequest];
+    set({ partnerRequests: updated });
+    saveLocalRequests(updated);
+  },
+
+  acceptPartnerRequest: async (requestId: string) => {
+    const { partnerRequests, availableUsers, pairWithUser } = get();
+    const request = partnerRequests.find((r) => r.id === requestId);
+    if (!request) return;
+
+    // Update request status to accepted
+    const updated = partnerRequests.map((r) =>
+      r.id === requestId ? { ...r, status: "accepted" as const } : r
+    );
+    set({ partnerRequests: updated });
+    saveLocalRequests(updated);
+
+    // Find the sender user and pair symmetrically
+    const senderUser = availableUsers.find((u) => u.id === request.fromUserId) || {
+      id: request.fromUserId,
+      coupleId: "",
+      displayName: request.fromUserName,
+      avatarUrl: request.fromUserAvatar,
+      isOnline: true,
+      isDnd: false,
+    };
+
+    await pairWithUser(senderUser);
+  },
+
+  declinePartnerRequest: async (requestId: string) => {
+    const { partnerRequests } = get();
+    const updated = partnerRequests.map((r) =>
+      r.id === requestId ? { ...r, status: "declined" as const } : r
+    );
+    set({ partnerRequests: updated });
+    saveLocalRequests(updated);
+  },
+
+  getIncomingRequests: () => {
+    const { currentUserId, partnerRequests } = get();
+    return partnerRequests.filter(
+      (r) => r.toUserId === currentUserId && r.status === "pending"
+    );
+  },
+
+  getRequestStatusForUser: (userId: string) => {
+    const { currentUserId, partnerRequests, isPaired, couple } = get();
+    if (isPaired && couple.partner2.id === userId) return "accepted";
+
+    const req = partnerRequests.find(
+      (r) =>
+        (r.fromUserId === currentUserId && r.toUserId === userId) ||
+        (r.fromUserId === userId && r.toUserId === currentUserId)
+    );
+
+    if (!req) return "none";
+    if (req.status === "accepted") return "accepted";
+    if (req.status === "declined") return "declined";
+    if (req.fromUserId === currentUserId) return "pending_sent";
+    return "pending_received";
+  },
+
   pairWithUser: async (targetUser: UserProfile) => {
     const { currentUserId, getActiveUser } = get();
     const activeUser = getActiveUser();
     const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
 
-    // Check if target user already belongs to a couple or create new couple
     let coupleId = targetUser.coupleId;
 
     if (!coupleId) {
-      // Generate a new couple ID
       const newPairingCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       
       if (isOnline) {
@@ -137,7 +238,6 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
       }
     }
 
-    // Assign couple_id to both users
     const updatedPartner1: UserProfile = { ...activeUser, coupleId };
     const updatedPartner2: UserProfile = { ...targetUser, coupleId };
 
@@ -190,7 +290,6 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
 
     if (isOnline) {
       try {
-        // Upsert profile in Supabase
         const { data: userProfile, error: upsertErr } = await supabase
           .from("users")
           .upsert({

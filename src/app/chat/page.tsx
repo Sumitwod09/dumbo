@@ -271,9 +271,12 @@ export default function ChatPage() {
           </button>
         </form>
       ) : (
-        <div className="bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/40 rounded-2xl p-4 text-center mt-2 shadow-sm">
-          <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
-            No one to chat with yet. Invite your partner to start chatting.
+        <div className="bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 text-center mt-2 shadow-sm space-y-1">
+          <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">
+            🔒 Private 2-User Hub is Locked
+          </p>
+          <p className="text-[11px] text-slate-600 dark:text-slate-400">
+            Search for your partner, send a request, and once accepted, your private chat and activity sharing will unlock automatically.
           </p>
         </div>
       )}

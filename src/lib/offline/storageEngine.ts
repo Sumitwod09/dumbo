@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   HYDRATION_LOGS: "dumbo_offline_hydration_logs",
   DOODLES: "dumbo_offline_doodles",
   PENDING_QUEUE: "dumbo_offline_pending_queue",
+  PARTNER_REQUESTS: "dumbo_offline_partner_requests",
 };
 
 /**
@@ -102,4 +103,13 @@ export function removePendingAction(actionId: string): void {
 
 export function clearPendingQueue(): void {
   setLocalItem(STORAGE_KEYS.PENDING_QUEUE, []);
+}
+
+// Partner Requests Persistence
+export function saveLocalRequests(requests: any[]): void {
+  setLocalItem(STORAGE_KEYS.PARTNER_REQUESTS, requests);
+}
+
+export function getLocalRequests(): any[] {
+  return getLocalItem(STORAGE_KEYS.PARTNER_REQUESTS, []);
 }

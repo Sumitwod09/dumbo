@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Users,
   Heart,
+  Search,
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
@@ -28,7 +29,13 @@ export function TopHeader() {
     couple,
     currentUserId,
     availableUsers,
-    pairWithUser,
+    searchQuery,
+    setSearchQuery,
+    sendPartnerRequest,
+    acceptPartnerRequest,
+    declinePartnerRequest,
+    getIncomingRequests,
+    getRequestStatusForUser,
     getActiveUser,
     getPartnerUser,
   } = useCoupleStore();
@@ -43,6 +50,11 @@ export function TopHeader() {
 
   const activeUser = getActiveUser();
   const partnerUser = getPartnerUser();
+  const incomingRequests = getIncomingRequests();
+
+  const filteredUsers = availableUsers.filter((u) =>
+    u.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Subscribe to offline sync status updates
   useEffect(() => {
@@ -213,53 +225,125 @@ export function TopHeader() {
               </p>
             </div>
 
-            {/* Direct 1-Click Registered User Pairing List */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                Connect Registered User:
-              </label>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                {availableUsers.map((u) => {
-                  const isCurrent = u.id === activeUser.id;
-                  const isAlreadyPartner = u.id === partnerUser.id;
-
-                  return (
+            {/* Search Bar & Direct Registered User List */}
+            <div className="space-y-2.5">
+              {/* Incoming Requests Notification Banner */}
+              {incomingRequests.length > 0 && (
+                <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-300">
+                    <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500 animate-bounce" />
+                    <span>Incoming Partner Request</span>
+                  </div>
+                  {incomingRequests.map((req) => (
                     <div
-                      key={u.id}
-                      className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700"
+                      key={req.id}
+                      className="flex items-center justify-between bg-white dark:bg-slate-900 p-2 rounded-lg border border-rose-100 dark:border-rose-900"
                     >
                       <div className="flex items-center gap-2">
                         <img
-                          src={u.avatarUrl}
-                          alt={u.displayName}
+                          src={req.fromUserAvatar}
+                          alt={req.fromUserName}
                           className="w-7 h-7 rounded-full bg-slate-200"
                         />
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                            {u.displayName} {isCurrent && "(You)"}
-                          </p>
-                          <span className="text-[10px] text-slate-400">Registered User</span>
-                        </div>
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                          {req.fromUserName}
+                        </span>
                       </div>
-
-                      {!isCurrent && (
+                      <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => {
-                            pairWithUser(u);
-                            setShowPairModal(false);
-                          }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                            isAlreadyPartner
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                              : "bg-rose-500 hover:bg-rose-600 text-white shadow-sm"
-                          }`}
+                          onClick={() => acceptPartnerRequest(req.id)}
+                          className="text-[11px] px-2.5 py-1 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-bold shadow-sm transition-colors"
                         >
-                          {isAlreadyPartner ? "Connected ♥" : "Pair Now"}
+                          Accept
                         </button>
-                      )}
+                        <button
+                          onClick={() => declinePartnerRequest(req.id)}
+                          className="text-[11px] px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-200 transition-colors"
+                        >
+                          Decline
+                        </button>
+                      </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              )}
+
+              {/* User Search Bar */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search user by name..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              {/* User List with Request Status */}
+              <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                {filteredUsers.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-4">No users found</p>
+                ) : (
+                  filteredUsers.map((u) => {
+                    const isCurrent = u.id === activeUser.id;
+                    const reqStatus = getRequestStatusForUser(u.id);
+
+                    return (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700"
+                      >
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={u.avatarUrl}
+                            alt={u.displayName}
+                            className="w-7 h-7 rounded-full bg-slate-200"
+                          />
+                          <div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              {u.displayName} {isCurrent && "(You)"}
+                            </p>
+                            <span className="text-[10px] text-slate-400">Registered User</span>
+                          </div>
+                        </div>
+
+                        {!isCurrent && (
+                          <div>
+                            {reqStatus === "accepted" ? (
+                              <span className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                Connected ♥
+                              </span>
+                            ) : reqStatus === "pending_sent" ? (
+                              <span className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                Request Sent ⏳
+                              </span>
+                            ) : reqStatus === "pending_received" ? (
+                              <button
+                                onClick={() => {
+                                  const incoming = getIncomingRequests().find(
+                                    (r) => r.fromUserId === u.id
+                                  );
+                                  if (incoming) acceptPartnerRequest(incoming.id);
+                                }}
+                                className="text-xs px-2.5 py-1 rounded-lg font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
+                              >
+                                Accept Request
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => sendPartnerRequest(u)}
+                                className="text-xs px-2.5 py-1 rounded-lg font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
+                              >
+                                Send Request
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
