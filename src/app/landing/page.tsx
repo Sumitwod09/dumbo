@@ -347,8 +347,9 @@ export default function LandingPage() {
           >
             <a
               id="cta-download-hero"
-              href="/dumbo-app-debug.apk"
-              download="dumbo-app-debug.apk"
+              href="https://github.com/Sumitwod09/dumbo/releases/latest/download/app-debug.apk"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group inline-flex items-center gap-2.5 px-7 py-3.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-bold text-sm rounded-full shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
             >
               <Download className="w-4.5 h-4.5 group-hover:animate-bounce" />

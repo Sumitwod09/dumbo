@@ -182,8 +182,9 @@ export function TopHeader() {
 
           {/* Download Android APK Button */}
           <a
-            href="/dumbo-app-debug.apk"
-            download="dumbo-app-debug.apk"
+            href="https://github.com/Sumitwod09/dumbo/releases/latest/download/app-debug.apk"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-semibold shadow-sm transition-all cursor-pointer"
             title="Download Dumbo Android APK for Mobile"
           >
@@ -386,8 +387,9 @@ export function TopHeader() {
             {/* Android APK Download Banner */}
             <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
               <a
-                href="/dumbo-app-debug.apk"
-                download="dumbo-app-debug.apk"
+                href="https://github.com/Sumitwod09/dumbo/releases/latest/download/app-debug.apk"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
                 <Smartphone className="w-4 h-4" />

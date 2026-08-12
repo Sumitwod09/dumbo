@@ -123,8 +123,9 @@ export default function HomeDashboard() {
           </div>
         </div>
         <a
-          href="/dumbo-app-debug.apk"
-          download="dumbo-app-debug.apk"
+          href="https://github.com/Sumitwod09/dumbo/releases/latest/download/app-debug.apk"
+          target="_blank"
+          rel="noopener noreferrer"
           className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1 hover:scale-105 active:scale-95 cursor-pointer"
         >
           <span>Download</span>
