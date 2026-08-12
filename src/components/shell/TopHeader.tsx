@@ -21,6 +21,8 @@ import {
   Users,
   Heart,
   Search,
+  Download,
+  Smartphone,
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
@@ -176,6 +178,18 @@ export function TopHeader() {
               </button>
             </SignInButton>
           </Show>
+
+          {/* Download Android APK Button */}
+          <a
+            href="https://github.com/Sumitwod09/dumbo/releases/download/v1.0.0/dumbo-app-debug.apk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-semibold shadow-sm transition-all"
+            title="Download Dumbo Android APK for Mobile"
+          >
+            <Download className="w-3 h-3" />
+            <span className="hidden sm:inline">APK</span>
+          </a>
 
           {/* Theme Indicator & Toggle */}
           <button
@@ -366,6 +380,19 @@ export function TopHeader() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Android APK Download Banner */}
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+              <a
+                href="https://github.com/Sumitwod09/dumbo/releases/download/v1.0.0/dumbo-app-debug.apk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-bold text-xs shadow-md transition-all"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>Download Android APK 📱</span>
+              </a>
             </div>
 
             <button
