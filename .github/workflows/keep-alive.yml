@@ -14,31 +14,35 @@ jobs:
         run: |
           echo "🏓 Pinging Supabase to prevent project pausing..."
 
+          # Resolve URL and Key from secrets or vars (supports both naming formats)
+          SUPA_URL="${{ secrets.EXPO_PUBLIC_SUPABASE_URL || vars.EXPO_PUBLIC_SUPABASE_URL || secrets.SUPABASE_URL || vars.SUPABASE_URL || 'https://ovxqusbsodeilsexbrzq.supabase.co' }}"
+          SUPA_KEY="${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY || vars.EXPO_PUBLIC_SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}"
+
           # Ping the REST API with a lightweight query
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/ping" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${SUPA_URL}/rest/v1/rpc/ping" \
+            -H "apikey: ${SUPA_KEY}" \
+            -H "Authorization: Bearer ${SUPA_KEY}" \
             -H "Content-Type: application/json" \
             -d '{}' \
             --max-time 30)
 
           echo "RPC ping response: $HTTP_STATUS"
 
-          # Fallback: Query the users table (will work even without the RPC function)
+          # Fallback: Query the users table
           HTTP_STATUS_2=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/users?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${SUPA_URL}/rest/v1/users?select=id&limit=1" \
+            -H "apikey: ${SUPA_KEY}" \
+            -H "Authorization: Bearer ${SUPA_KEY}" \
             --max-time 30)
 
           echo "Table query response: $HTTP_STATUS_2"
 
           # Ping the health endpoint
           HTTP_STATUS_3=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${SUPA_URL}/auth/v1/health" \
+            -H "apikey: ${SUPA_KEY}" \
             --max-time 30)
 
           echo "Health endpoint response: $HTTP_STATUS_3"
