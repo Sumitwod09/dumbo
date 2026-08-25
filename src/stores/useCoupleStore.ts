@@ -76,6 +76,7 @@ interface CoupleState {
   getActiveUser: () => UserProfile;
   getPartnerUser: () => UserProfile;
   switchActiveUser: (userId: string) => void;
+  unpairCouple: () => Promise<void>;
 }
 
 export const useCoupleStore = create<CoupleState>((set, get) => ({
@@ -181,6 +182,27 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
   },
 
   fetchAvailableUsers: async () => {
+    const defaultUsers: UserProfile[] = [
+      {
+        id: "user_kirti",
+        coupleId: "",
+        displayName: "Kirti Chaudhari",
+        username: "kirti",
+        avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Kirti",
+        isOnline: true,
+        isDnd: false,
+      },
+      {
+        id: "user_sumit",
+        coupleId: "",
+        displayName: "Sumit Wod",
+        username: "sumit",
+        avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Sumit",
+        isOnline: true,
+        isDnd: false,
+      },
+    ];
+
     try {
       const { data, error } = await supabase
         .from("users")
@@ -197,10 +219,42 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
           isOnline: u.is_online || false,
           isDnd: u.is_dnd || false,
         }));
-        set({ availableUsers: formatted });
+
+        // Merge fetched users with defaults without duplicating IDs
+        const existingIds = new Set(formatted.map((u) => u.id));
+        const merged = [...formatted, ...defaultUsers.filter((u) => !existingIds.has(u.id))];
+        set({ availableUsers: merged });
+      } else {
+        set({ availableUsers: defaultUsers });
       }
     } catch (err) {
       console.warn("Using offline available users fallback:", err);
+      set({ availableUsers: defaultUsers });
+    }
+  },
+
+  unpairCouple: async () => {
+    const { couple, currentUserId, getActiveUser } = get();
+    const activeUser = getActiveUser();
+    
+    const uncoupledCouple: Couple = {
+      id: "",
+      createdAt: new Date().toISOString(),
+      pairingCode: "UNPAIRED",
+      partner1: { ...activeUser, coupleId: "" },
+      partner2: PLACEHOLDER_PARTNER,
+    };
+
+    set({ couple: uncoupledCouple, isPaired: false });
+    saveLocalCouple(uncoupledCouple);
+
+    const isConnected = await syncEngine.isOnline();
+    if (isConnected && currentUserId) {
+      try {
+        await supabase.from("users").update({ couple_id: null }).eq("id", currentUserId);
+      } catch (e) {
+        console.warn("Offline unpair queued:", e);
+      }
     }
   },
 

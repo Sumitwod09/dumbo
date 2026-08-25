@@ -11,11 +11,12 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
-  Keyboard,
   Animated,
   Vibration,
+  ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Clipboard from "expo-clipboard";
 import { useChatStore } from "@/stores/useChatStore";
 import { useCoupleStore } from "@/stores/useCoupleStore";
 import { useThemeStore } from "@/stores/useThemeStore";
@@ -31,14 +32,20 @@ import {
   MicOff,
   VideoOff,
   PhoneOff,
-  Lock,
+  Heart,
+  Search,
+  UserPlus,
+  Copy,
+  Sparkles,
   PhoneCall,
-  PhoneIncoming,
   X,
+  UserCheck,
+  Users,
 } from "lucide-react-native";
 
 export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
+  const [copiedCode, setCopiedCode] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -58,20 +65,50 @@ export default function ChatScreen() {
     incrementCallDuration,
   } = useChatStore();
 
-  const { getActiveUser, getPartnerUser, isPaired, couple } = useCoupleStore();
+  const {
+    getActiveUser,
+    getPartnerUser,
+    isPaired,
+    couple,
+    availableUsers,
+    searchQuery,
+    setSearchQuery,
+    clearSearchQuery,
+    fetchAvailableUsers,
+    sendPartnerRequest,
+    acceptPartnerRequest,
+    declinePartnerRequest,
+    getIncomingRequests,
+    getRequestStatusForUser,
+    pairWithUser,
+    unpairCouple,
+  } = useCoupleStore();
+
   const { colors, isDark } = useThemeStore();
 
   const activeUser = getActiveUser();
   const partnerUser = getPartnerUser();
+  const incomingRequests = getIncomingRequests();
 
-  // Fetch messages on mount when paired
+  // Filter users by search query
+  const filteredUsers = availableUsers.filter((u) => {
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      u.displayName.toLowerCase().includes(q) ||
+      (u.username && u.username.toLowerCase().includes(q))
+    );
+  });
+
+  // Fetch available users and messages on mount
   useEffect(() => {
+    fetchAvailableUsers();
     if (isPaired && couple.id) {
       fetchMessages(couple.id);
     }
   }, [isPaired, couple.id]);
 
-  // Mark partner messages as read when screen is focused / messages change
+  // Mark partner messages as read when screen is viewed
   useEffect(() => {
     if (isPaired && activeUser.id && messages.length > 0) {
       const hasUnread = messages.some(
@@ -128,11 +165,15 @@ export default function ChatScreen() {
     }
   }, [callState.callStatus, callState.callDirection]);
 
-  const handleSend = useCallback(() => {
-    if (!inputText.trim()) return;
-    sendMessage(inputText.trim(), activeUser.id, activeUser.displayName);
-    setInputText("");
-  }, [inputText, activeUser.id, activeUser.displayName]);
+  const handleSend = useCallback(
+    (textToSend?: string) => {
+      const text = (textToSend || inputText).trim();
+      if (!text) return;
+      sendMessage(text, activeUser.id, activeUser.displayName);
+      if (!textToSend) setInputText("");
+    },
+    [inputText, activeUser.id, activeUser.displayName]
+  );
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -147,6 +188,12 @@ export default function ChatScreen() {
     }
   };
 
+  const handleCopyCode = async () => {
+    await Clipboard.setStringAsync(couple.pairingCode || "DUO-HUB");
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
   const formatCallDuration = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
@@ -159,25 +206,212 @@ export default function ChatScreen() {
     }, 100);
   }, []);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     if (messages.length > 0) {
       scrollToBottom();
     }
   }, [messages.length]);
 
-  // Determine if we should show the incoming call modal
+  const quickEmojis = ["❤️", "✨", "☕", "🥰", "🎵", "🙌"];
+
   const showIncomingCallModal =
     callState.isCallActive &&
     callState.callDirection === "incoming" &&
     callState.callStatus === "ringing";
 
-  // Determine if we should show the active call overlay
   const showActiveCallOverlay =
     callState.isCallActive &&
     (callState.callStatus === "connected" ||
       (callState.callStatus === "ringing" && callState.callDirection === "outgoing"));
 
+  // ==========================================
+  // UNPAIRED STATE: Connect with Partner Hub
+  // ==========================================
+  if (!isPaired) {
+    return (
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.unpairedScrollContent}
+      >
+        {/* Hero Card */}
+        <View style={styles.unpairedHeroCard}>
+          <View style={styles.heroHeartCircle}>
+            <Heart size={32} color="#f43f5e" fill="#f43f5e" />
+          </View>
+          <Text style={styles.unpairedHeroTitle}>Private 2-User Hub</Text>
+          <Text style={styles.unpairedHeroSubtitle}>
+            Dumbo is a private 1-on-1 space for you and your partner. Connect with your partner below to unlock live chat, instant audio & video calls, shared music, and hydration sync!
+          </Text>
+
+          {/* Quick Demo Pair Button */}
+          <TouchableOpacity
+            onPress={() => {
+              const demoUser = availableUsers.find((u) => u.id !== activeUser.id) || {
+                id: "user_kirti",
+                coupleId: "",
+                displayName: "Kirti Chaudhari",
+                username: "kirti",
+                avatarUrl: "https://api.dicebear.com/7.x/bottts/svg?seed=Kirti",
+                isOnline: true,
+                isDnd: false,
+              };
+              pairWithUser(demoUser);
+            }}
+            style={styles.quickPairBtn}
+          >
+            <Sparkles size={16} color="#ffffff" />
+            <Text style={styles.quickPairBtnText}>Instant Pair with Partner (Demo / Test)</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Incoming Partner Requests */}
+        {incomingRequests.length > 0 && (
+          <View style={[styles.cardSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <Heart size={16} color="#f43f5e" fill="#f43f5e" />
+              <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
+                Incoming Connection Request
+              </Text>
+            </View>
+            {incomingRequests.map((req) => (
+              <View key={req.id} style={styles.incomingReqItem}>
+                <Image source={{ uri: req.fromUserAvatar }} style={styles.userAvatar} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={[styles.userNameText, { color: colors.text }]}>{req.fromUserName}</Text>
+                  <Text style={styles.userRoleText}>wants to connect as your partner</Text>
+                </View>
+                <View style={styles.reqActionBtns}>
+                  <TouchableOpacity
+                    onPress={() => acceptPartnerRequest(req.id)}
+                    style={styles.acceptBtn}
+                  >
+                    <Text style={styles.acceptBtnText}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => declinePartnerRequest(req.id)}
+                    style={styles.declineBtn}
+                  >
+                    <Text style={styles.declineBtnText}>Decline</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Available Users & Search */}
+        <View style={[styles.cardSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeaderRow}>
+            <Users size={16} color="#f43f5e" />
+            <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>
+              Find & Connect With Registered Users
+            </Text>
+          </View>
+
+          {/* Search Box */}
+          <View style={[styles.searchBox, { backgroundColor: isDark ? "#0f172a" : "#f1f5f9" }]}>
+            <Search size={14} color="#94a3b8" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by name or @username..."
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              style={[styles.searchInput, { color: colors.text }]}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={clearSearchQuery} style={{ padding: 4 }}>
+                <X size={14} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* User List */}
+          <View style={styles.userList}>
+            {filteredUsers.length === 0 ? (
+              <Text style={styles.emptyUserListText}>No users found matching "{searchQuery}"</Text>
+            ) : (
+              filteredUsers.map((u) => {
+                const isCurrent = u.id === activeUser.id;
+                const reqStatus = getRequestStatusForUser(u.id);
+
+                return (
+                  <View key={u.id} style={[styles.userRow, { borderColor: colors.border }]}>
+                    <View style={styles.userInfoLeft}>
+                      <Image source={{ uri: u.avatarUrl }} style={styles.userAvatar} />
+                      <View>
+                        <View style={styles.nameWithDot}>
+                          <Text style={[styles.userNameText, { color: colors.text }]}>
+                            {u.displayName} {isCurrent ? "(You)" : ""}
+                          </Text>
+                          <View
+                            style={[
+                              styles.onlineStatusDot,
+                              { backgroundColor: u.isOnline ? "#10b981" : "#94a3b8" },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.userRoleText}>
+                          {u.username ? `@${u.username}` : "registered user"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {!isCurrent && (
+                      <View>
+                        {reqStatus === "accepted" ? (
+                          <View style={styles.connectedBadge}>
+                            <Text style={styles.connectedBadgeText}>Connected ♥</Text>
+                          </View>
+                        ) : reqStatus === "pending_sent" ? (
+                          <View style={styles.pendingBadge}>
+                            <Text style={styles.pendingBadgeText}>Pending ⏳</Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => pairWithUser(u)}
+                            style={styles.connectUserBtn}
+                          >
+                            <UserPlus size={13} color="#ffffff" />
+                            <Text style={styles.connectUserBtnText}>Connect & Chat</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </View>
+
+        {/* Pairing Code Card */}
+        <View style={[styles.cardSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardHeaderTitle, { color: colors.text, marginBottom: 4 }]}>
+            Your Pairing Code
+          </Text>
+          <Text style={styles.codeSubtitle}>
+            Share this pairing code with your partner so they can connect with you directly.
+          </Text>
+          <View style={[styles.codeDisplayBox, { backgroundColor: isDark ? "#0f172a" : "#f1f5f9" }]}>
+            <Text style={[styles.codeDisplayText, { color: colors.text }]}>
+              {couple.pairingCode || "DUO-HUB"}
+            </Text>
+            <TouchableOpacity onPress={handleCopyCode} style={styles.copyCodeBtn}>
+              {copiedCode ? <Check size={14} color="#10b981" /> : <Copy size={14} color="#f43f5e" />}
+              <Text style={[styles.copyCodeText, { color: copiedCode ? "#10b981" : "#f43f5e" }]}>
+                {copiedCode ? "Copied!" : "Copy"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // ==========================================
+  // PAIRED STATE: Active Chat View
+  // ==========================================
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -185,13 +419,23 @@ export default function ChatScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       {/* Top Action Bar */}
-      <View style={[styles.topBar, { borderColor: colors.border }]}>
+      <View style={[styles.topBar, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <View style={styles.topBarLeft}>
-          <MessageCircle size={20} color="#f43f5e" />
+          <Image source={{ uri: partnerUser.avatarUrl }} style={styles.topPartnerAvatar} />
           <View>
-            <Text style={[styles.topBarTitle, { color: colors.text }]}>Private Chat</Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.topBarTitle, { color: colors.text }]}>
+                {partnerUser.displayName}
+              </Text>
+              <View
+                style={[
+                  styles.onlineStatusDot,
+                  { backgroundColor: partnerUser.isOnline ? "#10b981" : "#94a3b8" },
+                ]}
+              />
+            </View>
             <Text style={[styles.topBarSub, { color: colors.textSecondary }]}>
-              End-to-End Isolated (2-User)
+              {partnerUser.isOnline ? "Active now" : "Offline"} • End-to-End Private
             </Text>
           </View>
         </View>
@@ -200,16 +444,38 @@ export default function ChatScreen() {
           <TouchableOpacity
             onPress={() => startCall("audio")}
             style={[styles.callIconBtn, { backgroundColor: isDark ? "#1e293b" : "#f1f5f9" }]}
+            accessibilityLabel="Audio Call"
           >
             <Phone size={16} color="#10b981" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => startCall("video")}
             style={[styles.callIconBtn, { backgroundColor: isDark ? "#1e293b" : "#f1f5f9" }]}
+            accessibilityLabel="Video Call"
           >
             <Video size={16} color="#f43f5e" />
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={unpairCouple}
+            style={[styles.unpairBtn, { backgroundColor: isDark ? "#1e293b" : "#f1f5f9" }]}
+            accessibilityLabel="Switch Partner"
+          >
+            <UserCheck size={14} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Quick Emojis Bar */}
+      <View style={[styles.quickEmojiBar, { backgroundColor: isDark ? "#0f172a" : "#f8fafc" }]}>
+        {quickEmojis.map((emoji) => (
+          <TouchableOpacity
+            key={emoji}
+            onPress={() => handleSend(emoji)}
+            style={styles.emojiPill}
+          >
+            <Text style={styles.emojiText}>{emoji}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Messages Thread */}
@@ -222,10 +488,10 @@ export default function ChatScreen() {
         onLayout={scrollToBottom}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MessageCircle size={40} color="#cbd5e1" />
+            <MessageCircle size={44} color="#cbd5e1" />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text>
             <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-              Say hi to your partner! 💬
+              Say hi to {partnerUser.displayName}! 💬
             </Text>
           </View>
         }
@@ -277,44 +543,34 @@ export default function ChatScreen() {
         }}
       />
 
-      {/* Input Bar or Gating Guard */}
-      {isPaired ? (
-        <View style={[styles.inputBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
-            <ImageIcon size={18} color="#64748b" />
-          </TouchableOpacity>
+      {/* Input Bar */}
+      <View style={[styles.inputBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
+          <ImageIcon size={18} color="#64748b" />
+        </TouchableOpacity>
 
-          <TextInput
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Message your partner..."
-            placeholderTextColor="#94a3b8"
-            style={[styles.input, { color: colors.text }]}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            multiline
-          />
+        <TextInput
+          value={inputText}
+          onChangeText={setInputText}
+          placeholder="Message your partner..."
+          placeholderTextColor="#94a3b8"
+          style={[styles.input, { color: colors.text }]}
+          onSubmitEditing={() => handleSend()}
+          returnKeyType="send"
+          blurOnSubmit={false}
+          multiline
+        />
 
-          <TouchableOpacity
-            onPress={handleSend}
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-            disabled={!inputText.trim()}
-          >
-            <Send size={16} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.lockedGuard}>
-          <Lock size={16} color="#e11d48" />
-          <Text style={styles.lockedTitle}>🔒 Private 2-User Hub is Locked</Text>
-          <Text style={styles.lockedSub}>
-            Search for your partner, send a request, and accept to unlock private chat.
-          </Text>
-        </View>
-      )}
+        <TouchableOpacity
+          onPress={() => handleSend()}
+          style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+          disabled={!inputText.trim()}
+        >
+          <Send size={16} color="#ffffff" />
+        </TouchableOpacity>
+      </View>
 
-      {/* ===== INCOMING CALL MODAL (Ringing) ===== */}
+      {/* ===== INCOMING CALL MODAL ===== */}
       <Modal visible={showIncomingCallModal} animationType="fade" transparent>
         <View style={styles.incomingCallOverlay}>
           <View style={styles.incomingCallCard}>
@@ -361,7 +617,7 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
-      {/* ===== ACTIVE CALL OVERLAY (Connected / Outgoing Ringing) ===== */}
+      {/* ===== ACTIVE CALL OVERLAY ===== */}
       <Modal visible={showActiveCallOverlay} animationType="fade">
         <View style={styles.callModalContainer}>
           <View style={styles.callHeader}>
@@ -455,6 +711,235 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+
+  // ===== UNPAIRED VIEW STYLES =====
+  unpairedScrollContent: {
+    padding: 16,
+    gap: 16,
+    paddingBottom: 40,
+  },
+  unpairedHeroCard: {
+    backgroundColor: "#f43f5e",
+    borderRadius: 20,
+    padding: 20,
+    alignItems: "center",
+    shadowColor: "#f43f5e",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  heroHeartCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  unpairedHeroTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  unpairedHeroSubtitle: {
+    color: "#ffe4e6",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  quickPairBtn: {
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quickPairBtnText: {
+    color: "#e11d48",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  cardSection: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  cardHeaderTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  incomingReqItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(244, 63, 94, 0.08)",
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  reqActionBtns: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  acceptBtn: {
+    backgroundColor: "#10b981",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  acceptBtnText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  declineBtn: {
+    backgroundColor: "#e2e8f0",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  declineBtnText: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 40,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    gap: 8,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12,
+  },
+  userList: {
+    gap: 10,
+  },
+  emptyUserListText: {
+    textAlign: "center",
+    color: "#94a3b8",
+    fontSize: 12,
+    paddingVertical: 14,
+  },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+  },
+  userInfoLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  userAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#e2e8f0",
+  },
+  nameWithDot: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  userNameText: {
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  onlineStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  userRoleText: {
+    fontSize: 11,
+    color: "#94a3b8",
+    marginTop: 1,
+  },
+  connectedBadge: {
+    backgroundColor: "#dcfce7",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  connectedBadgeText: {
+    color: "#15803d",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  pendingBadge: {
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  pendingBadgeText: {
+    color: "#b45309",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  connectUserBtn: {
+    backgroundColor: "#f43f5e",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  connectUserBtnText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  codeSubtitle: {
+    fontSize: 11,
+    color: "#94a3b8",
+    marginBottom: 8,
+  },
+  codeDisplayBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  codeDisplayText: {
+    fontSize: 15,
+    fontWeight: "bold",
+    letterSpacing: 2,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  copyCodeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    padding: 4,
+  },
+  copyCodeText: {
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+
+  // ===== PAIRED CHAT STYLES =====
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -466,7 +951,18 @@ const styles = StyleSheet.create({
   topBarLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+  },
+  topPartnerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f43f5e",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   topBarTitle: {
     fontSize: 14,
@@ -474,17 +970,44 @@ const styles = StyleSheet.create({
   },
   topBarSub: {
     fontSize: 10,
+    marginTop: 1,
   },
   topBarRight: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   callIconBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+  },
+  unpairBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickEmojiBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+  },
+  emojiPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  emojiText: {
+    fontSize: 16,
   },
   messageList: {
     padding: 14,
@@ -505,7 +1028,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   messageWrapper: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   mineWrapper: {
     alignItems: "flex-end",
@@ -586,25 +1109,6 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     opacity: 0.5,
-  },
-  lockedGuard: {
-    backgroundColor: "#fff1f2",
-    padding: 12,
-    margin: 12,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  lockedTitle: {
-    color: "#e11d48",
-    fontSize: 12,
-    fontWeight: "bold",
-    marginTop: 4,
-  },
-  lockedSub: {
-    color: "#475569",
-    fontSize: 10,
-    textAlign: "center",
-    marginTop: 2,
   },
 
   // ===== INCOMING CALL MODAL =====
