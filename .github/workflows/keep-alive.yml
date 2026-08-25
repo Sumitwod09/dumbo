@@ -1,0 +1,51 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # Run every 4 days at 06:00 UTC to prevent 7-day inactivity pause
+    - cron: '0 6 */4 * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          echo "🏓 Pinging Supabase to prevent project pausing..."
+
+          # Ping the REST API with a lightweight query
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/ping" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            --max-time 30)
+
+          echo "RPC ping response: $HTTP_STATUS"
+
+          # Fallback: Query the users table (will work even without the RPC function)
+          HTTP_STATUS_2=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/users?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            --max-time 30)
+
+          echo "Table query response: $HTTP_STATUS_2"
+
+          # Ping the health endpoint
+          HTTP_STATUS_3=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            --max-time 30)
+
+          echo "Health endpoint response: $HTTP_STATUS_3"
+
+          if [ "$HTTP_STATUS_2" -ge 200 ] && [ "$HTTP_STATUS_2" -lt 400 ]; then
+            echo "✅ Supabase project is alive and responding!"
+          else
+            echo "⚠️ Supabase might be paused or unreachable (status: $HTTP_STATUS_2)"
+            exit 1
+          fi
