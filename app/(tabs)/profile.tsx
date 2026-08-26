@@ -27,6 +27,7 @@ import {
   Users,
   UserPlus,
   RefreshCw,
+  Clock,
 } from "lucide-react-native";
 
 export default function ProfileScreen() {
@@ -312,11 +313,13 @@ export default function ProfileScreen() {
                     <View>
                       {reqStatus === "accepted" ? (
                         <View style={styles.connectedBadge}>
-                          <Text style={styles.connectedText}>Connected ♥</Text>
+                          <Heart size={11} color="#15803d" fill="#15803d" />
+                          <Text style={styles.connectedText}>Connected</Text>
                         </View>
                       ) : reqStatus === "pending_sent" ? (
                         <View style={styles.pendingBadge}>
-                          <Text style={styles.pendingText}>Pending ⏳</Text>
+                          <Clock size={11} color="#b45309" />
+                          <Text style={styles.pendingText}>Pending</Text>
                         </View>
                       ) : (
                         <TouchableOpacity
@@ -359,7 +362,7 @@ export default function ProfileScreen() {
           style={styles.apkDownloadBtn}
         >
           <Smartphone size={14} color="#ffffff" />
-          <Text style={styles.apkDownloadText}>Download Android APK 📱</Text>
+          <Text style={styles.apkDownloadText}>Download Android APK</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -653,6 +656,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   connectedText: {
     color: "#15803d",
@@ -664,6 +670,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pendingText: {
     color: "#b45309",

@@ -41,6 +41,11 @@ import {
   X,
   UserCheck,
   Users,
+  Coffee,
+  Smile,
+  Music,
+  ThumbsUp,
+  Clock,
 } from "lucide-react-native";
 
 export default function ChatScreen() {
@@ -184,7 +189,7 @@ export default function ChatScreen() {
 
     if (!result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
-      sendPhotoMessage(uri, activeUser.id, activeUser.displayName, "Shared a photo ✨");
+      sendPhotoMessage(uri, activeUser.id, activeUser.displayName, "Shared a photo");
     }
   };
 
@@ -212,7 +217,14 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
-  const quickEmojis = ["❤️", "✨", "☕", "🥰", "🎵", "🙌"];
+  const quickActions = [
+    { id: "heart", Icon: Heart, color: "#f43f5e", fill: "#f43f5e", text: "Love you!" },
+    { id: "sparkles", Icon: Sparkles, color: "#eab308", fill: undefined, text: "Thinking of you" },
+    { id: "coffee", Icon: Coffee, color: "#b45309", fill: undefined, text: "Coffee break?" },
+    { id: "smile", Icon: Smile, color: "#10b981", fill: undefined, text: "Hey there!" },
+    { id: "music", Icon: Music, color: "#8b5cf6", fill: undefined, text: "Listening to music" },
+    { id: "thumbsup", Icon: ThumbsUp, color: "#0284c7", fill: undefined, text: "Sounds good!" },
+  ];
 
   const showIncomingCallModal =
     callState.isCallActive &&
@@ -361,11 +373,13 @@ export default function ChatScreen() {
                       <View>
                         {reqStatus === "accepted" ? (
                           <View style={styles.connectedBadge}>
-                            <Text style={styles.connectedBadgeText}>Connected ♥</Text>
+                            <Heart size={11} color="#15803d" fill="#15803d" />
+                            <Text style={styles.connectedBadgeText}>Connected</Text>
                           </View>
                         ) : reqStatus === "pending_sent" ? (
                           <View style={styles.pendingBadge}>
-                            <Text style={styles.pendingBadgeText}>Pending ⏳</Text>
+                            <Clock size={11} color="#b45309" />
+                            <Text style={styles.pendingBadgeText}>Pending</Text>
                           </View>
                         ) : (
                           <TouchableOpacity
@@ -465,17 +479,24 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      {/* Quick Emojis Bar */}
-      <View style={[styles.quickEmojiBar, { backgroundColor: isDark ? "#0f172a" : "#f8fafc" }]}>
-        {quickEmojis.map((emoji) => (
-          <TouchableOpacity
-            key={emoji}
-            onPress={() => handleSend(emoji)}
-            style={styles.emojiPill}
-          >
-            <Text style={styles.emojiText}>{emoji}</Text>
-          </TouchableOpacity>
-        ))}
+      {/* Quick Action Icons Bar */}
+      <View style={[styles.quickActionsBar, { backgroundColor: isDark ? "#0f172a" : "#f8fafc" }]}>
+        {quickActions.map((action) => {
+          const IconComp = action.Icon;
+          return (
+            <TouchableOpacity
+              key={action.id}
+              onPress={() => handleSend(action.text)}
+              style={[
+                styles.actionIconPill,
+                { backgroundColor: isDark ? "#1e293b" : "#ffffff", borderColor: colors.border },
+              ]}
+              accessibilityLabel={action.text}
+            >
+              <IconComp size={15} color={action.color} fill={action.fill} />
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Messages Thread */}
@@ -491,7 +512,7 @@ export default function ChatScreen() {
             <MessageCircle size={44} color="#cbd5e1" />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text>
             <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-              Say hi to {partnerUser.displayName}! 💬
+              Say hi to {partnerUser.displayName}!
             </Text>
           </View>
         }
@@ -528,7 +549,10 @@ export default function ChatScreen() {
                   {isMine && (
                     <View>
                       {item.isPendingSync ? (
-                        <Text style={styles.pendingSyncText}>Pending ⏳</Text>
+                        <View style={styles.pendingSyncBox}>
+                          <Clock size={9} color="#fde68a" />
+                          <Text style={styles.pendingSyncText}>Pending</Text>
+                        </View>
                       ) : item.readAt ? (
                         <CheckCheck size={12} color="#bae6fd" />
                       ) : (
@@ -875,9 +899,12 @@ const styles = StyleSheet.create({
   },
   connectedBadge: {
     backgroundColor: "#dcfce7",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   connectedBadgeText: {
     color: "#15803d",
@@ -886,9 +913,12 @@ const styles = StyleSheet.create({
   },
   pendingBadge: {
     backgroundColor: "#fef3c7",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pendingBadgeText: {
     color: "#b45309",
@@ -991,7 +1021,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  quickEmojiBar: {
+  quickActionsBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
@@ -1000,14 +1030,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: "rgba(0,0,0,0.05)",
   },
-  emojiPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.05)",
-  },
-  emojiText: {
-    fontSize: 16,
+  actionIconPill: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
   },
   messageList: {
     padding: 14,
@@ -1073,6 +1102,11 @@ const styles = StyleSheet.create({
   },
   metaTime: {
     fontSize: 9,
+  },
+  pendingSyncBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
   pendingSyncText: {
     fontSize: 8,

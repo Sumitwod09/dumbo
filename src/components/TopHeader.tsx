@@ -28,6 +28,7 @@ import {
   Copy,
   Check,
   X,
+  Clock,
 } from "lucide-react-native";
 
 export function TopHeader() {
@@ -288,11 +289,13 @@ export function TopHeader() {
                         <View>
                           {reqStatus === "accepted" ? (
                             <View style={styles.connectedTag}>
-                              <Text style={styles.connectedText}>Connected ♥</Text>
+                              <Heart size={10} color="#15803d" fill="#15803d" />
+                              <Text style={styles.connectedText}>Connected</Text>
                             </View>
                           ) : reqStatus === "pending_sent" ? (
                             <View style={styles.pendingTag}>
-                              <Text style={styles.pendingText}>Pending ⏳</Text>
+                              <Clock size={10} color="#b45309" />
+                              <Text style={styles.pendingText}>Pending</Text>
                             </View>
                           ) : (
                             <TouchableOpacity
@@ -606,6 +609,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   connectedText: {
     color: "#15803d",
@@ -617,6 +623,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   pendingText: {
     color: "#b45309",
