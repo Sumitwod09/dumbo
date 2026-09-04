@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { Platform } from "react-native";
 import { Audio } from "expo-av";
 import { Song } from "@/types";
 import { supabase } from "@/lib/supabase/client";
@@ -108,11 +109,13 @@ export const useAudioStore = create<AudioState>((set, get) => {
       }
 
       try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-        });
+        if (Platform.OS !== "web") {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+          });
+        }
 
         const { sound } = await Audio.Sound.createAsync(
           { uri: track.storagePath },

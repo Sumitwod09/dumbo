@@ -13,6 +13,9 @@ import {
   enqueuePendingAction,
 } from "@/lib/offline/storageEngine";
 import { syncEngine } from "@/lib/offline/syncEngine";
+import { toast } from "@/components/Toast";
+
+let userRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
 export interface PartnerRequest {
   id: string;
@@ -71,7 +74,7 @@ interface CoupleState {
   getIncomingRequests: () => PartnerRequest[];
   pairWithUser: (targetUser: UserProfile) => Promise<void>;
   toggleDnd: (userId: string) => Promise<void>;
-  setPairingCode: (code: string) => Promise<void>;
+  setPairingCode: (code: string) => Promise<{ success: boolean; message?: string }>;
   setOnlineStatus: (userId: string, isOnline: boolean) => Promise<void>;
   getActiveUser: () => UserProfile;
   getPartnerUser: () => UserProfile;
@@ -426,6 +429,37 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
         if (!upsertErr && userProfile) {
           get().fetchAvailableUsers();
 
+          // Listen for live updates on this user row (e.g. when partner pairs with you)
+          if (!userRealtimeChannel) {
+            try {
+              userRealtimeChannel = supabase
+                .channel(`user_sync_${userId}`)
+                .on(
+                  "postgres_changes",
+                  {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "users",
+                    filter: `id=eq.${userId}`,
+                  },
+                  async (payload: any) => {
+                    const fresh = payload.new;
+                    const curCoupleId = get().couple.id;
+                    if (fresh?.couple_id && fresh.couple_id !== curCoupleId) {
+                      // Partner linked! Re-sync session
+                      await get().syncUserSession({
+                        id: fresh.id,
+                        fullName: fresh.display_name,
+                        imageUrl: fresh.avatar_url,
+                      });
+                      toast.success("Connected with Partner", "You and your partner are now paired!");
+                    }
+                  }
+                )
+                .subscribe();
+            } catch {}
+          }
+
           if (userProfile.couple_id) {
             const { data: members } = await supabase
               .from("users")
@@ -535,42 +569,56 @@ export const useCoupleStore = create<CoupleState>((set, get) => ({
     saveLocalCouple(updatedCouple);
   },
 
-  setPairingCode: async (code: string) => {
-    const { currentUserId } = get();
-    if (!currentUserId) return;
+  setPairingCode: async (code: string): Promise<{ success: boolean; message?: string }> => {
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode) return { success: false, message: "Please enter a pairing code." };
 
-    const { data: existingCouple } = await supabase
-      .from("couples")
-      .select("*")
-      .eq("pairing_code", code)
-      .single();
+    const { currentUserId, getActiveUser } = get();
+    if (!currentUserId) return { success: false, message: "You must be signed in to pair." };
 
-    let coupleId = existingCouple?.id;
-
-    if (!coupleId) {
-      const { data: newCouple, error: createErr } = await supabase
+    try {
+      const { data: existingCouple } = await supabase
         .from("couples")
-        .insert({ pairing_code: code })
-        .select()
-        .single();
+        .select("*")
+        .eq("pairing_code", cleanCode)
+        .maybeSingle();
 
-      if (createErr) {
-        console.error("Failed to create couple:", createErr);
-        return;
+      let coupleId = existingCouple?.id;
+
+      if (!coupleId) {
+        const { data: newCouple, error: createErr } = await supabase
+          .from("couples")
+          .insert({ pairing_code: cleanCode })
+          .select()
+          .single();
+
+        if (createErr || !newCouple) {
+          return { success: false, message: createErr?.message || "Failed to create couple room." };
+        }
+        coupleId = newCouple.id;
       }
-      coupleId = newCouple.id;
-    }
 
-    await supabase.from("users").update({ couple_id: coupleId }).eq("id", currentUserId);
+      // Assign couple_id to current user
+      const { error: updateErr } = await supabase
+        .from("users")
+        .update({ couple_id: coupleId })
+        .eq("id", currentUserId);
 
-    const { data: freshUser } = await supabase.from("users").select("*").eq("id", currentUserId).single();
-    if (freshUser) {
-      const clerkUserMock = {
-        id: freshUser.id,
-        fullName: freshUser.display_name,
-        imageUrl: freshUser.avatar_url,
-      };
-      await get().syncUserSession(clerkUserMock);
+      if (updateErr) {
+        return { success: false, message: updateErr.message };
+      }
+
+      // Re-sync session
+      const activeUser = getActiveUser();
+      await get().syncUserSession({
+        id: currentUserId,
+        fullName: activeUser.displayName,
+        imageUrl: activeUser.avatarUrl,
+      });
+
+      return { success: true, message: `Connected to session code: ${cleanCode}` };
+    } catch (err: any) {
+      return { success: false, message: err?.message || "An error occurred during pairing." };
     }
   },
 

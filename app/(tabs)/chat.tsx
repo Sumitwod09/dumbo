@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Clipboard from "expo-clipboard";
+import { toast } from "@/components/Toast";
 import { useChatStore } from "@/stores/useChatStore";
 import { useCoupleStore } from "@/stores/useCoupleStore";
 import { useThemeStore } from "@/stores/useThemeStore";
@@ -51,6 +52,8 @@ import {
 export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
   const [copiedCode, setCopiedCode] = useState(false);
+  const [inputPairingCode, setInputPairingCode] = useState("");
+  const [isPairingLoading, setIsPairingLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -86,6 +89,7 @@ export default function ChatScreen() {
     getIncomingRequests,
     getRequestStatusForUser,
     pairWithUser,
+    setPairingCode,
     unpairCouple,
   } = useCoupleStore();
 
@@ -197,6 +201,28 @@ export default function ChatScreen() {
     await Clipboard.setStringAsync(couple.pairingCode || "DUO-HUB");
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleJoinWithCode = async () => {
+    const code = inputPairingCode.trim().toUpperCase();
+    if (!code) {
+      toast.warning("Pairing Code Required", "Please enter a code to join your partner.");
+      return;
+    }
+    setIsPairingLoading(true);
+    try {
+      const res = await setPairingCode(code);
+      if (res.success) {
+        toast.success("Pairing Successful", res.message || "Connected with partner!");
+        setInputPairingCode("");
+      } else {
+        toast.error("Pairing Failed", res.message || "Could not link with that code.");
+      }
+    } catch (err: any) {
+      toast.error("Pairing Error", err?.message || "An unexpected error occurred.");
+    } finally {
+      setIsPairingLoading(false);
+    }
   };
 
   const formatCallDuration = (secs: number) => {
@@ -416,6 +442,47 @@ export default function ChatScreen() {
               <Text style={[styles.copyCodeText, { color: copiedCode ? "#10b981" : "#f43f5e" }]}>
                 {copiedCode ? "Copied!" : "Copy"}
               </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Join Partner with Code */}
+          <View style={[styles.enterCodeDivider, { backgroundColor: colors.border }]} />
+          <Text style={[styles.cardHeaderTitle, { color: colors.text, marginBottom: 4 }]}>
+            Join Partner With Code
+          </Text>
+          <Text style={styles.codeSubtitle}>
+            Have your partner's code? Enter it below to link your accounts together instantly.
+          </Text>
+          <View style={styles.enterCodeRow}>
+            <TextInput
+              value={inputPairingCode}
+              onChangeText={setInputPairingCode}
+              placeholder="e.g. DUO-HUB"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="characters"
+              maxLength={12}
+              style={[
+                styles.enterCodeInput,
+                {
+                  color: colors.text,
+                  backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                  borderColor: colors.border,
+                },
+              ]}
+            />
+            <TouchableOpacity
+              onPress={handleJoinWithCode}
+              disabled={isPairingLoading || !inputPairingCode.trim()}
+              style={[
+                styles.enterCodeBtn,
+                (!inputPairingCode.trim() || isPairingLoading) && styles.enterCodeBtnDisabled,
+              ]}
+            >
+              {isPairingLoading ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.enterCodeBtnText}>Connect</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -1356,5 +1423,40 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "bold",
     marginTop: 2,
+  },
+  enterCodeDivider: {
+    height: 1,
+    marginVertical: 14,
+  },
+  enterCodeRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  enterCodeInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
+  enterCodeBtn: {
+    backgroundColor: "#f43f5e",
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  enterCodeBtnDisabled: {
+    opacity: 0.5,
+  },
+  enterCodeBtnText: {
+    color: "#ffffff",
+    fontWeight: "bold",
+    fontSize: 13,
   },
 });

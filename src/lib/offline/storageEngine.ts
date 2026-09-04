@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   DOODLES: "dumbo_offline_doodles",
   PENDING_QUEUE: "dumbo_offline_pending_queue",
   PARTNER_REQUESTS: "dumbo_offline_partner_requests",
+  CANVAS_STROKES: "dumbo_offline_canvas_strokes",
 };
 
 // In-memory cache for synchronous reads (hydrated on app start)
@@ -132,6 +133,15 @@ export async function saveLocalRequests(requests: any[]): Promise<void> {
 
 export function getLocalRequests(): any[] {
   return getLocalItem(STORAGE_KEYS.PARTNER_REQUESTS, []);
+}
+
+// Canvas Strokes Persistence
+export async function saveLocalStrokes(strokes: any[]): Promise<void> {
+  await setLocalItem(STORAGE_KEYS.CANVAS_STROKES, strokes);
+}
+
+export function getLocalStrokes(): any[] {
+  return getLocalItem(STORAGE_KEYS.CANVAS_STROKES, []);
 }
 
 /**

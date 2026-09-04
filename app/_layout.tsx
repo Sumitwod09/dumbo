@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, AppState, AppStateStatus } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, AppState, AppStateStatus, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useUser, useAuth } from "@clerk/clerk-expo";
 import { tokenCache } from "@/lib/auth/tokenCache";
@@ -19,7 +19,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
 // Prevent splash screen from auto-hiding
-SplashScreen.preventAutoHideAsync().catch(() => {});
+if (Platform.OS !== "web") {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
@@ -42,7 +44,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Hide splash screen once auth state is determined
   useEffect(() => {
-    if (isLoaded) {
+    if (isLoaded && Platform.OS !== "web") {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [isLoaded]);

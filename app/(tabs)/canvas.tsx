@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import {
   Trash2,
   X,
   Image as ImageIcon,
+  Wifi,
+  Users,
 } from "lucide-react-native";
 
 export default function CanvasScreen() {
@@ -35,6 +37,9 @@ export default function CanvasScreen() {
     savedDoodles,
     activeColor,
     brushWidth,
+    isSynced,
+    subscribeToCanvas,
+    cleanupCanvasSubscription,
     addStroke,
     undoLastStroke,
     clearCanvas,
@@ -44,12 +49,20 @@ export default function CanvasScreen() {
     deleteDoodle,
   } = useCanvasStore();
 
-  const { getActiveUser } = useCoupleStore();
+  const { getActiveUser, getPartnerUser, couple, isPaired } = useCoupleStore();
   const { colors, isDark } = useThemeStore();
   const activeUser = getActiveUser();
+  const partnerUser = getPartnerUser();
 
   const currentPath = useRef<{ x: number; y: number }[]>([]);
   const [currentStrokePath, setCurrentStrokePath] = useState<string>("");
+
+  // Subscribe to collaborative canvas broadcast channel
+  useEffect(() => {
+    if (isPaired && couple?.id) {
+      subscribeToCanvas(couple.id);
+    }
+  }, [isPaired, couple?.id]);
 
   const colorOptions = [
     "#f43f5e",
@@ -61,24 +74,32 @@ export default function CanvasScreen() {
     "#ffffff",
   ];
 
+  // Helper to extract coordinates safely on both native touch & web mouse
+  const getCoordinates = (evt: GestureResponderEvent) => {
+    const native = evt.nativeEvent as any;
+    const x = native.locationX ?? native.offsetX ?? native.layerX ?? 0;
+    const y = native.locationY ?? native.offsetY ?? native.layerY ?? 0;
+    return { x: Math.round(x), y: Math.round(y) };
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt: GestureResponderEvent) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        currentPath.current = [{ x: locationX, y: locationY }];
-        setCurrentStrokePath(`M ${locationX} ${locationY}`);
+        const { x, y } = getCoordinates(evt);
+        currentPath.current = [{ x, y }];
+        setCurrentStrokePath(`M ${x} ${y}`);
       },
       onPanResponderMove: (evt: GestureResponderEvent) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        currentPath.current.push({ x: locationX, y: locationY });
-        setCurrentStrokePath((prev) => `${prev} L ${locationX} ${locationY}`);
+        const { x, y } = getCoordinates(evt);
+        currentPath.current.push({ x, y });
+        setCurrentStrokePath((prev) => `${prev} L ${x} ${y}`);
       },
       onPanResponderRelease: () => {
         if (currentPath.current.length > 0) {
           addStroke({
-            id: `stroke-${Date.now()}`,
+            id: `stroke-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             color: activeColor,
             width: brushWidth,
             points: [...currentPath.current],
@@ -116,9 +137,17 @@ export default function CanvasScreen() {
           <View style={styles.titleRow}>
             <Pencil size={20} color="#f43f5e" />
             <Text style={[styles.pageTitle, { color: colors.text }]}>Real-Time Canvas</Text>
+            {isPaired && (
+              <View style={[styles.collabBadge, { backgroundColor: isSynced ? "#dcfce7" : "#fef3c7" }]}>
+                <View style={[styles.statusDot, { backgroundColor: isSynced ? "#16a34a" : "#d97706" }]} />
+                <Text style={[styles.collabBadgeText, { color: isSynced ? "#15803d" : "#b45309" }]}>
+                  {isSynced ? `Live with ${partnerUser.displayName.split(" ")[0]}` : "Connecting..."}
+                </Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.pageSub, { color: colors.textSecondary }]}>
-            Draw together in real-time
+            {isPaired ? "Draw together collaboratively in real-time" : "Draw and save your personal sketches (Pair to draw live)"}
           </Text>
         </View>
 
@@ -229,11 +258,11 @@ export default function CanvasScreen() {
 
             {/* Actions Toolbar */}
             <View style={styles.actionsRow}>
-              <TouchableOpacity onPress={undoLastStroke} style={styles.actionBtn}>
+              <TouchableOpacity onPress={() => undoLastStroke()} style={styles.actionBtn}>
                 <Undo2 size={14} color={colors.text} />
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Undo</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={clearCanvas} style={styles.actionBtn}>
+              <TouchableOpacity onPress={() => clearCanvas()} style={styles.actionBtn}>
                 <Eraser size={14} color={colors.text} />
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Clear</Text>
               </TouchableOpacity>
@@ -316,6 +345,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    flexWrap: "wrap",
+  },
+  collabBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginLeft: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  collabBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   pageTitle: {
     fontSize: 16,

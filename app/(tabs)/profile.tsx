@@ -57,6 +57,7 @@ export default function ProfileScreen() {
     toggleDnd,
     getActiveUser,
     getPartnerUser,
+    setPairingCode,
   } = useCoupleStore();
 
   const { signOut } = useAuth();
@@ -70,6 +71,8 @@ export default function ProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [inputPairingCode, setInputPairingCode] = useState("");
+  const [isPairingLoading, setIsPairingLoading] = useState(false);
 
   useEffect(() => {
     setDisplayName(activeUser.displayName || "");
@@ -146,6 +149,28 @@ export default function ProfileScreen() {
     await Clipboard.setStringAsync(couple.pairingCode || "DUO-HUB");
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleJoinWithCode = async () => {
+    const code = inputPairingCode.trim().toUpperCase();
+    if (!code) {
+      toast.warning("Pairing Code Required", "Please enter a code to join your partner.");
+      return;
+    }
+    setIsPairingLoading(true);
+    try {
+      const res = await setPairingCode(code);
+      if (res.success) {
+        toast.success("Pairing Successful", res.message || "Connected with partner!");
+        setInputPairingCode("");
+      } else {
+        toast.error("Pairing Failed", res.message || "Could not link with that code.");
+      }
+    } catch (err: any) {
+      toast.error("Pairing Error", err?.message || "An unexpected error occurred.");
+    } finally {
+      setIsPairingLoading(false);
+    }
   };
 
   const filteredUsers = availableUsers.filter((u) => {
@@ -404,6 +429,45 @@ export default function ProfileScreen() {
           <Text style={[styles.codeDisplayText, { color: colors.text }]}>
             {couple.pairingCode || "DUO-HUB"}
           </Text>
+        </View>
+
+        {/* Enter Partner's Code */}
+        <View style={[styles.codeDivider, { backgroundColor: colors.border }]} />
+        <Text style={[styles.inputLabel, { color: colors.text }]}>Connect With Partner's Code</Text>
+        <Text style={[styles.codeSubtitle, { color: colors.textSecondary }]}>
+          Enter your partner's 6-character code to pair your devices.
+        </Text>
+        <View style={styles.enterCodeRow}>
+          <TextInput
+            value={inputPairingCode}
+            onChangeText={setInputPairingCode}
+            placeholder="e.g. DUO-HUB"
+            placeholderTextColor="#94a3b8"
+            autoCapitalize="characters"
+            maxLength={12}
+            style={[
+              styles.enterCodeInput,
+              {
+                color: colors.text,
+                backgroundColor: isDark ? "#0f172a" : "#f8fafc",
+                borderColor: colors.border,
+              },
+            ]}
+          />
+          <TouchableOpacity
+            onPress={handleJoinWithCode}
+            disabled={isPairingLoading || !inputPairingCode.trim()}
+            style={[
+              styles.enterCodeBtn,
+              (!inputPairingCode.trim() || isPairingLoading) && styles.enterCodeBtnDisabled,
+            ]}
+          >
+            {isPairingLoading ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.enterCodeBtnText}>Connect</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -802,5 +866,44 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     fontSize: 13,
     fontWeight: "bold",
+  },
+  codeDivider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  codeSubtitle: {
+    fontSize: 11,
+    marginBottom: 8,
+  },
+  enterCodeRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  enterCodeInput: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
+  enterCodeBtn: {
+    backgroundColor: "#f43f5e",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  enterCodeBtnDisabled: {
+    opacity: 0.5,
+  },
+  enterCodeBtnText: {
+    color: "#ffffff",
+    fontWeight: "bold",
+    fontSize: 12,
   },
 });
