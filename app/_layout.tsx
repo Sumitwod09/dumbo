@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import React, { useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, AppState, AppStateStatus } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useUser, useAuth } from "@clerk/clerk-expo";
 import { tokenCache } from "@/lib/auth/tokenCache";
@@ -12,8 +12,14 @@ import { useCoupleStore } from "@/stores/useCoupleStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
+import { ToastProvider, toast } from "@/components/Toast";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
@@ -33,6 +39,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/(tabs)");
     }
   }, [isSignedIn, isLoaded, segments]);
+
+  // Hide splash screen once auth state is determined
+  useEffect(() => {
+    if (isLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoaded]);
 
   if (!isLoaded) {
     return (
@@ -56,7 +69,8 @@ function AppContent() {
   const { user, isLoaded } = useUser();
   const { loadStoredTheme, computeThemeFromTime, isDark } = useThemeStore();
   const { tick, isRunning } = useTimerStore();
-  const { syncUserSession, couple, isPaired } = useCoupleStore();
+  const { syncUserSession, couple, isPaired, setOnlineStatus, getActiveUser } =
+    useCoupleStore();
   const { subscribeToCallSignals } = useChatStore();
 
   // Initialize offline storage cache & network listener & keep-alive
@@ -73,6 +87,31 @@ function AppContent() {
       clearInterval(themeInterval);
     };
   }, []);
+
+  // App lifecycle: mark online/offline on foreground/background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      const activeUser = getActiveUser();
+      if (!activeUser || activeUser.id === "loading") return;
+
+      if (nextAppState === "active") {
+        // App came to foreground
+        setOnlineStatus(activeUser.id, true);
+        syncEngine.flushQueue(); // Re-sync any pending offline actions
+
+        // Re-fetch messages if paired
+        if (isPaired && couple.id) {
+          useChatStore.getState().fetchMessages(couple.id);
+        }
+      } else if (nextAppState === "background" || nextAppState === "inactive") {
+        // App went to background
+        setOnlineStatus(activeUser.id, false);
+      }
+    };
+
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    return () => subscription.remove();
+  }, [isPaired, couple.id]);
 
   // Sync Clerk session with store
   useEffect(() => {
@@ -111,6 +150,7 @@ function AppContent() {
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         </Stack>
       </AuthGate>
+      <ToastProvider />
     </>
   );
 }
@@ -118,9 +158,11 @@ function AppContent() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
-        <AppContent />
-      </ClerkProvider>
+      <ErrorBoundary fallbackTitle="Dumbo encountered an error">
+        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+          <AppContent />
+        </ClerkProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
@@ -160,3 +202,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+

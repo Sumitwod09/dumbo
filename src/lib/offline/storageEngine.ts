@@ -133,3 +133,18 @@ export async function saveLocalRequests(requests: any[]): Promise<void> {
 export function getLocalRequests(): any[] {
   return getLocalItem(STORAGE_KEYS.PARTNER_REQUESTS, []);
 }
+
+/**
+ * Clear all locally cached data (used during sign-out)
+ */
+export async function clearAllStorage(): Promise<void> {
+  const keys = Object.values(STORAGE_KEYS);
+  keys.forEach((key) => {
+    memoryCache[key] = null;
+  });
+  try {
+    await AsyncStorage.multiRemove(keys);
+  } catch (err) {
+    console.error("Failed to clear all storage:", err);
+  }
+}

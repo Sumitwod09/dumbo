@@ -10,10 +10,17 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  Alert,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { useAuth } from "@clerk/clerk-expo";
 import { useCoupleStore } from "@/stores/useCoupleStore";
+import { useChatStore } from "@/stores/useChatStore";
+import { useAudioStore } from "@/stores/useAudioStore";
 import { useThemeStore } from "@/stores/useThemeStore";
+import { clearAllStorage } from "@/lib/offline/storageEngine";
+import { syncEngine } from "@/lib/offline/syncEngine";
+import { toast } from "@/components/Toast";
 import {
   User,
   AtSign,
@@ -28,7 +35,9 @@ import {
   UserPlus,
   RefreshCw,
   Clock,
+  LogOut,
 } from "lucide-react-native";
+
 
 export default function ProfileScreen() {
   const {
@@ -50,6 +59,7 @@ export default function ProfileScreen() {
     getPartnerUser,
   } = useCoupleStore();
 
+  const { signOut } = useAuth();
   const { colors, isDark } = useThemeStore();
   const activeUser = getActiveUser();
   const partnerUser = getPartnerUser();
@@ -86,9 +96,50 @@ export default function ProfileScreen() {
 
     if (res.success) {
       setFeedback({ type: "success", text: "Profile settings & unique username updated!" });
+      toast.success("Profile Updated", "Your settings have been saved.");
     } else {
       setFeedback({ type: "error", text: res.error || "Failed to update profile." });
+      toast.error("Update Failed", res.error || "Could not save profile.");
     }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out of Dumbo? Your offline data will be cleared.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Mark user offline
+              const isConnected = await syncEngine.isOnline();
+              if (isConnected && activeUser.id) {
+                const { supabase } = require("@/lib/supabase/client");
+                await supabase.from("users").update({ is_online: false }).eq("id", activeUser.id);
+              }
+
+              // Cleanup subscriptions & audio
+              useChatStore.getState().cleanupSubscriptions();
+              useAudioStore.getState().cleanup();
+              syncEngine.stopListening();
+
+              // Clear all local storage
+              await clearAllStorage();
+
+              // Sign out from Clerk
+              await signOut();
+            } catch (err) {
+              console.error("Sign out error:", err);
+              // Force sign out even if cleanup fails
+              try { await signOut(); } catch {}
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCopyCode = async () => {
@@ -365,6 +416,15 @@ export default function ProfileScreen() {
           <Text style={styles.apkDownloadText}>Download Android APK</Text>
         </TouchableOpacity>
       </View>
+
+      {/* 5. Sign Out */}
+      <TouchableOpacity
+        onPress={handleSignOut}
+        style={[styles.signOutBtn, { backgroundColor: isDark ? "#1e293b" : "#fff1f2", borderColor: isDark ? "#334155" : "#fecdd3" }]}
+      >
+        <LogOut size={16} color="#ef4444" />
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -727,6 +787,20 @@ const styles = StyleSheet.create({
   apkDownloadText: {
     color: "#ffffff",
     fontSize: 12,
+    fontWeight: "bold",
+  },
+  signOutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  signOutText: {
+    color: "#ef4444",
+    fontSize: 13,
     fontWeight: "bold",
   },
 });

@@ -8,6 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dumbo.app"
@@ -28,7 +33,9 @@
       ]
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-splash-screen"
     ]
   }
 }
+
