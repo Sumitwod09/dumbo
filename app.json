@@ -24,9 +24,6 @@
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "permissions": [
-        "SEND_SMS",
-        "RECEIVE_SMS",
-        "READ_SMS",
         "CAMERA",
         "RECORD_AUDIO",
         "ACCESS_NETWORK_STATE"
